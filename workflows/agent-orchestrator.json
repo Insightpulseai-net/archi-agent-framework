@@ -1,0 +1,370 @@
+{
+  "name": "Agent Orchestrator",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "agent-task",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [250, 300],
+      "webhookId": "agent-task-webhook",
+      "id": "webhook-trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate and prepare agent task\nconst input = $json;\n\n// Required fields\nif (!input.agent || !input.task_type || !input.payload) {\n  throw new Error('Missing required fields: agent, task_type, payload');\n}\n\n// Agent configuration\nconst agents = {\n  'odoo-developer': {\n    url: $env.ODOO_DEVELOPER_AGENT_URL || `${$env.MCP_URL}/agents/odoo-developer`,\n    timeout: 120000,\n    capabilities: ['code_generation', 'module_creation', 'bug_fix']\n  },\n  'finance-ssc': {\n    url: $env.FINANCE_SSC_AGENT_URL || `${$env.MCP_URL}/agents/finance-ssc`,\n    timeout: 60000,\n    capabilities: ['report_analysis', 'reconciliation', 'audit_support']\n  },\n  'devops': {\n    url: $env.DEVOPS_AGENT_URL || `${$env.MCP_URL}/agents/devops`,\n    timeout: 180000,\n    capabilities: ['deployment', 'monitoring', 'infrastructure']\n  },\n  'bi-architect': {\n    url: $env.BI_ARCHITECT_AGENT_URL || `${$env.MCP_URL}/agents/bi-architect`,\n    timeout: 90000,\n    capabilities: ['dashboard_design', 'query_optimization', 'data_modeling']\n  }\n};\n\nconst agentConfig = agents[input.agent];\nif (!agentConfig) {\n  throw new Error(`Unknown agent: ${input.agent}. Available: ${Object.keys(agents).join(', ')}`);\n}\n\nreturn {\n  json: {\n    task_id: input.task_id || `task-${Date.now()}`,\n    agent: input.agent,\n    agent_url: agentConfig.url,\n    timeout: agentConfig.timeout,\n    task_type: input.task_type,\n    payload: input.payload,\n    priority: input.priority || 'normal',\n    retry_count: 0,\n    max_retries: 3,\n    created_at: new Date().toISOString()\n  }\n};"
+      },
+      "name": "Validate Task",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300],
+      "id": "validate-task"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.WORKBENCH_API_URL }}/api/v1/execute/sql",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  sql: `INSERT INTO workbench.agent_tasks \n        (task_id, agent, task_type, payload, priority, status, created_at)\n        VALUES ($1, $2, $3, $4, $5, 'pending', NOW())`,\n  parameters: [\n    $json.task_id,\n    $json.agent,\n    $json.task_type,\n    JSON.stringify($json.payload),\n    $json.priority\n  ],\n  connection_id: $env.WORKBENCH_DB_CONNECTION_ID\n}) }}",
+        "options": {}
+      },
+      "name": "Log Task Start",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [650, 300],
+      "id": "log-start",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "workbench-api-key",
+          "name": "Workbench API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Validate Task').first().json.agent_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-API-Key",
+              "value": "={{ $env.MCP_API_KEY }}"
+            },
+            {
+              "name": "X-Task-ID",
+              "value": "={{ $('Validate Task').first().json.task_id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  task_type: $('Validate Task').first().json.task_type,\n  payload: $('Validate Task').first().json.payload,\n  context: {\n    task_id: $('Validate Task').first().json.task_id,\n    priority: $('Validate Task').first().json.priority,\n    workbench_callback: `${$env.N8N_WEBHOOK_URL}/agent-callback`\n  }\n}) }}",
+        "options": {
+          "timeout": "={{ $('Validate Task').first().json.timeout }}"
+        }
+      },
+      "name": "Call Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [850, 300],
+      "id": "call-agent"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.statusCode }}",
+              "value2": 200,
+              "operation": "equal"
+            }
+          ]
+        }
+      },
+      "name": "Check Response",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1050, 300],
+      "id": "check-response"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.WORKBENCH_API_URL }}/api/v1/execute/sql",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  sql: `UPDATE workbench.agent_tasks \n        SET status = 'completed', result = $1, completed_at = NOW()\n        WHERE task_id = $2`,\n  parameters: [\n    JSON.stringify($json),\n    $('Validate Task').first().json.task_id\n  ],\n  connection_id: $env.WORKBENCH_DB_CONNECTION_ID\n}) }}",
+        "options": {}
+      },
+      "name": "Log Success",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1250, 200],
+      "id": "log-success",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "workbench-api-key",
+          "name": "Workbench API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Handle retry logic\nconst task = $('Validate Task').first().json;\nconst retryCount = task.retry_count + 1;\n\nif (retryCount >= task.max_retries) {\n  return {\n    json: {\n      should_retry: false,\n      task_id: task.task_id,\n      error: 'Max retries exceeded',\n      retry_count: retryCount\n    }\n  };\n}\n\n// Exponential backoff\nconst backoffMs = Math.pow(2, retryCount) * 1000;\n\nreturn {\n  json: {\n    should_retry: true,\n    task_id: task.task_id,\n    retry_count: retryCount,\n    backoff_ms: backoffMs,\n    ...task\n  }\n};"
+      },
+      "name": "Handle Retry",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 400],
+      "id": "handle-retry"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.should_retry }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Should Retry",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1450, 400],
+      "id": "should-retry"
+    },
+    {
+      "parameters": {
+        "amount": "={{ $json.backoff_ms }}"
+      },
+      "name": "Wait Backoff",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1650, 350],
+      "id": "wait-backoff"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.WORKBENCH_API_URL }}/api/v1/execute/sql",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  sql: `UPDATE workbench.agent_tasks \n        SET status = 'failed', error = $1, completed_at = NOW()\n        WHERE task_id = $2`,\n  parameters: [\n    $json.error,\n    $json.task_id\n  ],\n  connection_id: $env.WORKBENCH_DB_CONNECTION_ID\n}) }}",
+        "options": {}
+      },
+      "name": "Log Failure",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1650, 500],
+      "id": "log-failure",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "workbench-api-key",
+          "name": "Workbench API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "webhookUrl": "={{ $env.SLACK_WEBHOOK_URL }}",
+        "text": "=❌ *Agent Task Failed*\n\n*Task ID:* {{ $json.task_id }}\n*Agent:* {{ $('Validate Task').first().json.agent }}\n*Error:* {{ $json.error }}\n*Retries:* {{ $json.retry_count }}/{{ $('Validate Task').first().json.max_retries }}"
+      },
+      "name": "Notify Failure",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.1,
+      "position": [1850, 500],
+      "id": "notify-failure"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, task_id: $('Validate Task').first().json.task_id, status: 'completed', result: $('Call Agent').first().json }) }}"
+      },
+      "name": "Response Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1450, 200],
+      "id": "response-success"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, task_id: $json.task_id, status: 'failed', error: $json.error }) }}"
+      },
+      "name": "Response Failure",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [2050, 500],
+      "id": "response-failure"
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Task": {
+      "main": [
+        [
+          {
+            "node": "Log Task Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Task Start": {
+      "main": [
+        [
+          {
+            "node": "Call Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Agent": {
+      "main": [
+        [
+          {
+            "node": "Check Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Response": {
+      "main": [
+        [
+          {
+            "node": "Log Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Success": {
+      "main": [
+        [
+          {
+            "node": "Response Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Retry": {
+      "main": [
+        [
+          {
+            "node": "Should Retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Retry": {
+      "main": [
+        [
+          {
+            "node": "Wait Backoff",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Backoff": {
+      "main": [
+        [
+          {
+            "node": "Call Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Failure": {
+      "main": [
+        [
+          {
+            "node": "Notify Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Failure": {
+      "main": [
+        [
+          {
+            "node": "Response Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "agent",
+      "id": "agent-tag"
+    },
+    {
+      "name": "orchestration",
+      "id": "orchestration-tag"
+    }
+  ]
+}

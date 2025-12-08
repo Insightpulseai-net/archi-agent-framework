@@ -1,0 +1,288 @@
+{
+  "name": "Month-End Finance Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 1 * *"
+            }
+          ]
+        }
+      },
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [250, 300],
+      "id": "schedule-trigger"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.ODOO_URL }}/web/session/authenticate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "jsonrpc",
+              "value": "2.0"
+            },
+            {
+              "name": "params",
+              "value": "={{ JSON.stringify({ db: $env.ODOO_DB, login: $env.ODOO_USER, password: $env.ODOO_API_KEY }) }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Odoo Auth",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [450, 300],
+      "id": "odoo-auth"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.ODOO_URL }}/web/dataset/call_kw",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Cookie",
+              "value": "={{ $json.headers['set-cookie'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  jsonrpc: '2.0',\n  method: 'call',\n  params: {\n    model: 'account.move.line',\n    method: 'search_read',\n    args: [\n      [['date', '>=', $now.minus({months: 1}).startOf('month').toISODate()],\n       ['date', '<=', $now.minus({months: 1}).endOf('month').toISODate()],\n       ['parent_state', '=', 'posted']]\n    ],\n    kwargs: {\n      fields: ['id', 'move_id', 'account_id', 'partner_id', 'debit', 'credit', 'date', 'name', 'ref']\n    }\n  }\n}) }}",
+        "options": {}
+      },
+      "name": "Extract GL Transactions",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [650, 300],
+      "id": "extract-gl"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.ODOO_URL }}/web/dataset/call_kw",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Cookie",
+              "value": "={{ $node['Odoo Auth'].json.headers['set-cookie'] }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  jsonrpc: '2.0',\n  method: 'call',\n  params: {\n    model: 'account.move',\n    method: 'search_read',\n    args: [\n      [['move_type', 'in', ['in_invoice', 'in_refund']],\n       ['state', '=', 'posted'],\n       ['invoice_date', '>=', $now.minus({months: 1}).startOf('month').toISODate()],\n       ['invoice_date', '<=', $now.minus({months: 1}).endOf('month').toISODate()]]\n    ],\n    kwargs: {\n      fields: ['id', 'name', 'partner_id', 'amount_total', 'amount_residual', 'invoice_date', 'invoice_date_due', 'currency_id']\n    }\n  }\n}) }}",
+        "options": {}
+      },
+      "name": "Extract AP Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [650, 500],
+      "id": "extract-ap"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combine GL and AP data\nconst glData = $input.first().json.result || [];\nconst apData = $('Extract AP Data').first().json.result || [];\n\n// Calculate totals\nconst totalDebit = glData.reduce((sum, line) => sum + (line.debit || 0), 0);\nconst totalCredit = glData.reduce((sum, line) => sum + (line.credit || 0), 0);\nconst totalAP = apData.reduce((sum, inv) => sum + (inv.amount_residual || 0), 0);\n\n// Group by account\nconst byAccount = glData.reduce((acc, line) => {\n  const accountId = line.account_id?.[0] || 'unknown';\n  const accountName = line.account_id?.[1] || 'Unknown';\n  if (!acc[accountId]) {\n    acc[accountId] = { name: accountName, debit: 0, credit: 0 };\n  }\n  acc[accountId].debit += line.debit || 0;\n  acc[accountId].credit += line.credit || 0;\n  return acc;\n}, {});\n\nreturn {\n  json: {\n    period: $now.minus({months: 1}).toFormat('yyyy-MM'),\n    gl_summary: {\n      total_transactions: glData.length,\n      total_debit: totalDebit,\n      total_credit: totalCredit,\n      by_account: Object.entries(byAccount).map(([id, data]) => ({\n        account_id: id,\n        ...data,\n        net: data.debit - data.credit\n      }))\n    },\n    ap_summary: {\n      total_invoices: apData.length,\n      total_outstanding: totalAP\n    },\n    generated_at: new Date().toISOString()\n  }\n};"
+      },
+      "name": "Generate Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 400],
+      "id": "generate-summary"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.WORKBENCH_API_URL }}/api/v1/integrations/superset/datasets/{{ $env.SUPERSET_FINANCE_DATASET_ID }}/refresh",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "name": "Push to Superset",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1050, 400],
+      "id": "push-superset",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "workbench-api-key",
+          "name": "Workbench API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "webhookUrl": "={{ $env.SLACK_WEBHOOK_URL }}",
+        "text": "=📊 *Month-End Finance Summary - {{ $json.period }}*\n\n*GL Transactions:* {{ $json.gl_summary.total_transactions }}\n*Total Debit:* {{ $json.gl_summary.total_debit.toLocaleString('en-US', {style: 'currency', currency: 'USD'}) }}\n*Total Credit:* {{ $json.gl_summary.total_credit.toLocaleString('en-US', {style: 'currency', currency: 'USD'}) }}\n\n*AP Outstanding:* {{ $json.ap_summary.total_outstanding.toLocaleString('en-US', {style: 'currency', currency: 'USD'}) }} ({{ $json.ap_summary.total_invoices }} invoices)\n\n<{{ $env.SUPERSET_URL }}/superset/dashboard/finance/|View Dashboard>"
+      },
+      "name": "Notify Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.1,
+      "position": [1250, 400],
+      "id": "notify-slack"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.WORKBENCH_API_URL }}/api/v1/pipelines/runs/{{ $executionId }}/complete",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: 'completed', metrics: $json }) }}",
+        "options": {}
+      },
+      "name": "Log Completion",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1450, 400],
+      "id": "log-completion",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "workbench-api-key",
+          "name": "Workbench API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "errorMessage": "Month-end finance pipeline failed"
+      },
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [1050, 600],
+      "id": "error-handler"
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Odoo Auth",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Odoo Auth": {
+      "main": [
+        [
+          {
+            "node": "Extract GL Transactions",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Extract AP Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract GL Transactions": {
+      "main": [
+        [
+          {
+            "node": "Generate Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract AP Data": {
+      "main": [
+        [
+          {
+            "node": "Generate Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Summary": {
+      "main": [
+        [
+          {
+            "node": "Push to Superset",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Push to Superset": {
+      "main": [
+        [
+          {
+            "node": "Notify Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Slack": {
+      "main": [
+        [
+          {
+            "node": "Log Completion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "finance",
+      "id": "finance-tag"
+    },
+    {
+      "name": "month-end",
+      "id": "month-end-tag"
+    }
+  ],
+  "pinData": {}
+}

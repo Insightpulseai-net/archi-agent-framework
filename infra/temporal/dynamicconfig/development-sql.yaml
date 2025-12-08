@@ -1,0 +1,48 @@
+# Temporal Dynamic Configuration
+# This file configures Temporal server behavior
+
+# History Service Configuration
+history.persistenceMaxQPS:
+  - value: 3000
+    constraints: {}
+
+history.persistenceGlobalMaxQPS:
+  - value: 0
+    constraints: {}
+
+# Matching Service Configuration
+matching.numTaskqueueReadPartitions:
+  - value: 5
+    constraints: {}
+
+matching.numTaskqueueWritePartitions:
+  - value: 5
+    constraints: {}
+
+# Frontend Service Configuration
+frontend.persistenceMaxQPS:
+  - value: 3000
+    constraints: {}
+
+frontend.persistenceGlobalMaxQPS:
+  - value: 0
+    constraints: {}
+
+# Worker Configuration
+worker.enableScheduler:
+  - value: true
+    constraints: {}
+
+worker.enableBatcher:
+  - value: true
+    constraints: {}
+
+# System Configuration
+system.forceSearchAttributesCacheRefreshOnRead:
+  - value: true
+    constraints: {}
+
+# Retention
+retention.maxRetentionDays:
+  - value: 30
+    constraints: {}

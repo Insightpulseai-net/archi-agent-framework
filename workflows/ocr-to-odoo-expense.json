@@ -1,0 +1,364 @@
+{
+  "name": "OCR to Odoo Expense",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ocr-expense",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [250, 300],
+      "webhookId": "ocr-expense-webhook",
+      "id": "webhook-trigger"
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "binaryPropertyName": "data",
+        "options": {}
+      },
+      "name": "Store Document",
+      "type": "n8n-nodes-base.s3",
+      "typeVersion": 1,
+      "position": [450, 300],
+      "id": "store-document",
+      "credentials": {
+        "s3": {
+          "id": "minio-credentials",
+          "name": "MinIO"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.OCR_SERVICE_URL }}/api/v1/extract",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "={{ $env.OCR_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "file_url",
+              "value": "={{ $json.Location }}"
+            },
+            {
+              "name": "document_type",
+              "value": "expense"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "name": "Call OCR Service",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [650, 300],
+      "id": "call-ocr"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse OCR response and map to Odoo expense format\nconst ocrResult = $json;\n\n// Extract key fields with fallbacks\nconst vendorName = ocrResult.extracted_data?.vendor || ocrResult.extracted_data?.merchant || 'Unknown Vendor';\nconst amount = parseFloat(ocrResult.extracted_data?.total || ocrResult.extracted_data?.amount || 0);\nconst date = ocrResult.extracted_data?.date || new Date().toISOString().split('T')[0];\nconst description = ocrResult.extracted_data?.description || `Expense from ${vendorName}`;\nconst category = ocrResult.extracted_data?.category || 'Miscellaneous';\n\n// Confidence check\nconst confidence = ocrResult.confidence || 0;\nconst needsReview = confidence < 0.85;\n\n// Map category to Odoo product\nconst categoryMapping = {\n  'Travel': 'product.product_expense_travel',\n  'Meals': 'product.product_expense_meals',\n  'Office': 'product.product_expense_office',\n  'Miscellaneous': 'product.product_expense_misc'\n};\n\nreturn {\n  json: {\n    document_id: $input.first().json.ETag?.replace(/\"/g, '') || 'unknown',\n    storage_url: $input.first().json.Location,\n    ocr_confidence: confidence,\n    needs_review: needsReview,\n    expense_data: {\n      name: description,\n      unit_amount: amount,\n      date: date,\n      reference: `OCR-${Date.now()}`,\n      product_id: categoryMapping[category] || categoryMapping['Miscellaneous'],\n      description: `Vendor: ${vendorName}\\nCategory: ${category}\\nOCR Confidence: ${(confidence * 100).toFixed(1)}%`\n    },\n    vendor_name: vendorName,\n    raw_extraction: ocrResult.extracted_data\n  }\n};"
+      },
+      "name": "Map to Expense",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300],
+      "id": "map-expense"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.needs_review }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Check Confidence",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1050, 300],
+      "id": "check-confidence"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.ODOO_URL }}/web/session/authenticate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ jsonrpc: '2.0', params: { db: $env.ODOO_DB, login: $env.ODOO_USER, password: $env.ODOO_API_KEY } }) }}",
+        "options": {}
+      },
+      "name": "Odoo Auth",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1250, 200],
+      "id": "odoo-auth"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.ODOO_URL }}/web/dataset/call_kw",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Cookie",
+              "value": "={{ $json.headers?.['set-cookie'] || '' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  jsonrpc: '2.0',\n  method: 'call',\n  params: {\n    model: 'hr.expense',\n    method: 'create',\n    args: [$('Map to Expense').first().json.expense_data],\n    kwargs: {}\n  }\n}) }}",
+        "options": {}
+      },
+      "name": "Create Odoo Expense",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1450, 200],
+      "id": "create-expense"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.WORKBENCH_API_URL }}/api/v1/execute/sql",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  sql: `INSERT INTO silver.expense_review_queue \n        (document_id, storage_url, vendor_name, amount, ocr_confidence, raw_data, status, created_at)\n        VALUES ($1, $2, $3, $4, $5, $6, 'pending', NOW())`,\n  parameters: [\n    $json.document_id,\n    $json.storage_url,\n    $json.vendor_name,\n    $json.expense_data.unit_amount,\n    $json.ocr_confidence,\n    JSON.stringify($json.raw_extraction)\n  ],\n  connection_id: $env.WORKBENCH_DB_CONNECTION_ID\n}) }}",
+        "options": {}
+      },
+      "name": "Queue for Review",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1250, 400],
+      "id": "queue-review",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "workbench-api-key",
+          "name": "Workbench API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "webhookUrl": "={{ $env.SLACK_WEBHOOK_URL }}",
+        "text": "=🔍 *Expense Requires Manual Review*\n\n*Document:* {{ $json.document_id }}\n*Vendor:* {{ $json.vendor_name }}\n*Amount:* {{ $json.expense_data.unit_amount.toLocaleString('en-US', {style: 'currency', currency: 'USD'}) }}\n*Confidence:* {{ ($json.ocr_confidence * 100).toFixed(1) }}%\n\n<{{ $env.WORKBENCH_URL }}/review/{{ $json.document_id }}|Review Now>"
+      },
+      "name": "Notify Review",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.1,
+      "position": [1450, 400],
+      "id": "notify-review"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.WORKBENCH_API_URL }}/api/v1/execute/sql",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  sql: `INSERT INTO bronze.document_processing_log \n        (document_id, storage_url, processing_type, status, odoo_record_id, metadata, processed_at)\n        VALUES ($1, $2, 'ocr_expense', 'completed', $3, $4, NOW())`,\n  parameters: [\n    $('Map to Expense').first().json.document_id,\n    $('Map to Expense').first().json.storage_url,\n    $json.result || null,\n    JSON.stringify({ confidence: $('Map to Expense').first().json.ocr_confidence })\n  ],\n  connection_id: $env.WORKBENCH_DB_CONNECTION_ID\n}) }}",
+        "options": {}
+      },
+      "name": "Log Success",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [1650, 200],
+      "id": "log-success",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "workbench-api-key",
+          "name": "Workbench API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, document_id: $('Map to Expense').first().json.document_id, expense_id: $('Create Odoo Expense').first().json.result, needs_review: false }) }}"
+      },
+      "name": "Response Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1850, 200],
+      "id": "response-success"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, document_id: $json.document_id, needs_review: true, review_reason: 'Low OCR confidence' }) }}"
+      },
+      "name": "Response Review",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1650, 400],
+      "id": "response-review"
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Store Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Document": {
+      "main": [
+        [
+          {
+            "node": "Call OCR Service",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call OCR Service": {
+      "main": [
+        [
+          {
+            "node": "Map to Expense",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map to Expense": {
+      "main": [
+        [
+          {
+            "node": "Check Confidence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Confidence": {
+      "main": [
+        [
+          {
+            "node": "Odoo Auth",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Queue for Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Odoo Auth": {
+      "main": [
+        [
+          {
+            "node": "Create Odoo Expense",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Odoo Expense": {
+      "main": [
+        [
+          {
+            "node": "Log Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Queue for Review": {
+      "main": [
+        [
+          {
+            "node": "Notify Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Review": {
+      "main": [
+        [
+          {
+            "node": "Response Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Success": {
+      "main": [
+        [
+          {
+            "node": "Response Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "ocr",
+      "id": "ocr-tag"
+    },
+    {
+      "name": "expense",
+      "id": "expense-tag"
+    }
+  ]
+}
