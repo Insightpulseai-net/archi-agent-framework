@@ -1,0 +1,201 @@
+name: Canonical Schema Validation
+
+on:
+  pull_request:
+    paths:
+      - 'packages/db/sql/**'
+      - 'docs/DATA_MODEL.md'
+      - 'Makefile'
+  push:
+    branches:
+      - main
+    paths:
+      - 'packages/db/sql/**'
+
+jobs:
+  validate-schema:
+    name: Validate Database Schema
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Wait for PostgreSQL
+        run: |
+          until pg_isready -h localhost -p 5432 -U postgres; do
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
+
+      - name: Set environment variables
+        run: |
+          echo "POSTGRES_URL=postgresql://postgres:postgres@localhost:5432/test_db" >> $GITHUB_ENV
+
+      - name: Run naming convention checks
+        run: make check-naming
+
+      - name: Initialize database schema
+        run: |
+          make db-init
+          make db-seed-core
+          make db-seed-rag
+          make db-kg-seed
+
+      - name: Validate schema integrity
+        run: make validate-schema
+
+      - name: Check RLS policy coverage
+        run: make check-rls
+
+      - name: Run smoke tests
+        run: make db-smoke
+
+      - name: Comprehensive validation
+        run: make validate-all
+
+      - name: Generate schema report
+        if: always()
+        run: |
+          echo "## Schema Validation Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Database Tables" >> $GITHUB_STEP_SUMMARY
+          psql "$POSTGRES_URL" -c "\dt" >> $GITHUB_STEP_SUMMARY || true
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### KG Schema Tables" >> $GITHUB_STEP_SUMMARY
+          psql "$POSTGRES_URL" -c "\dt kg.*" >> $GITHUB_STEP_SUMMARY || true
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### RLS Policies" >> $GITHUB_STEP_SUMMARY
+          psql "$POSTGRES_URL" -c "SELECT schemaname, tablename, policyname FROM pg_policies;" >> $GITHUB_STEP_SUMMARY || true
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Indexes" >> $GITHUB_STEP_SUMMARY
+          psql "$POSTGRES_URL" -c "\di" >> $GITHUB_STEP_SUMMARY || true
+
+  audit-schema:
+    name: Canonical Schema Audit
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get changed SQL files
+        id: changed-files
+        uses: tj-actions/changed-files@v40
+        with:
+          files: |
+            packages/db/sql/**/*.sql
+
+      - name: Display changed files
+        if: steps.changed-files.outputs.any_changed == 'true'
+        run: |
+          echo "Changed SQL files:"
+          echo "${{ steps.changed-files.outputs.all_changed_files }}"
+
+      - name: Check for schema violations
+        if: steps.changed-files.outputs.any_changed == 'true'
+        run: |
+          echo "## Schema Changes Detected" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The following SQL files have been modified:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
+            echo "- \`$file\`" >> $GITHUB_STEP_SUMMARY
+          done
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Canonical Schema Compliance" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Please ensure:" >> $GITHUB_STEP_SUMMARY
+          echo "- [ ] All identifiers use \`snake_case\` (no camelCase)" >> $GITHUB_STEP_SUMMARY
+          echo "- [ ] All timestamps use \`timestamptz\` (not \`timestamp\`)" >> $GITHUB_STEP_SUMMARY
+          echo "- [ ] All tables have \`tenant_id\` and RLS policies" >> $GITHUB_STEP_SUMMARY
+          echo "- [ ] Vector embeddings use \`vector(1536)\`" >> $GITHUB_STEP_SUMMARY
+          echo "- [ ] Foreign keys have explicit \`ON DELETE\` behavior" >> $GITHUB_STEP_SUMMARY
+          echo "- [ ] \`docs/DATA_MODEL.md\` is updated" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📋 **Review Checklist**: [CANONICAL_SCHEMA_CHECKLIST.md](docs/CANONICAL_SCHEMA_CHECKLIST.md)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Comment on PR
+        if: steps.changed-files.outputs.any_changed == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const changedFiles = '${{ steps.changed-files.outputs.all_changed_files }}'.split(' ');
+            const body = `## 🔍 Schema Changes Detected
+
+The following SQL files have been modified:
+${changedFiles.map(f => `- \`${f}\``).join('\n')}
+
+### ✅ Canonical Schema Compliance Checklist
+
+Please ensure all of the following before merging:
+
+- [ ] All identifiers use \`snake_case\` (no camelCase/PascalCase)
+- [ ] All timestamps use \`timestamptz\` (not \`timestamp\`)
+- [ ] All tables have \`tenant_id\` and appropriate RLS policies
+- [ ] Vector embeddings use \`vector(1536)\` with \`model text\` column
+- [ ] Foreign keys have explicit \`ON DELETE CASCADE\` or \`ON DELETE RESTRICT\`
+- [ ] \`docs/DATA_MODEL.md\` is updated to reflect changes
+- [ ] Migration file follows naming convention: \`NN_descriptive_name.sql\`
+
+### 📋 Review Resources
+
+- [Canonical Schema Checklist](docs/CANONICAL_SCHEMA_CHECKLIST.md)
+- [Canonical Schema Auditor Prompt](docs/CANONICAL_SCHEMA_AUDITOR_PROMPT.md)
+- [Data Model Specification](docs/DATA_MODEL.md)
+
+### 🧪 Local Validation
+
+Run these commands locally before pushing:
+
+\`\`\`bash
+make check-naming       # Check for naming violations
+make validate-schema    # Validate schema integrity
+make check-rls          # Verify RLS coverage
+make db-smoke          # Run smoke tests
+\`\`\`
+
+---
+
+_This comment was automatically generated by the Canonical Schema Validation workflow._`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+  block-if-violations:
+    name: Block Merge on Violations
+    runs-on: ubuntu-latest
+    needs: [validate-schema]
+    if: failure()
+
+    steps:
+      - name: Fail workflow
+        run: |
+          echo "❌ Schema validation failed. Cannot merge until all violations are fixed."
+          echo ""
+          echo "Run 'make validate-all' locally to identify issues."
+          exit 1
