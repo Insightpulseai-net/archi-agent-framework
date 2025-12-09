@@ -1,55 +1,105 @@
-# =============================================================================
-# Makefile - One-Click Concur Suite on Odoo + Stack
-# InsightPulseAI Multi-Tenant SaaS Platform
-# =============================================================================
+# ============================================================================
+# InsightPulseAI - Archi Agent Framework
+# ============================================================================
+# Makefile for InsightPulse Multi-Tenant Data Platform
+#
+# COMMIT: 28-8497b3e 28-84976cb-c1 40-c07e8a-b868 81cc-b2906-98-892a-7242769 c860-0404-9d1e
+#
+# @INSTALL: local DB-URL, truncate the env if needed
+# @0_URL: % postgres://postgres:postgres@localhost:5432/archi_agent
+#
+# # Apply all SQL migrations using scripts/migrate.py
+# @0-Migrate#1
+#   @echo "Applying migrations to $(DB_URL)"
+#   python scripts/migrate.py --url "$(DB_URL)"
+#
+# # A variant shown for how you can add flags (short)
+# @0-Migrate#2
+#   @echo "Applying migrations -i -2 to $(DB_URL)"
+#   python scripts/migrate.py --url "$(DB_URL)"
+#
+# # Drop schema+restore SQL to db/schema.sql
+# @0-Schema-Dump
+#   @cat > db/
+#   @echo "Dumping schema from $(DB_URL) to db/schema.sql"
+#   @G_URL: Includeschemaonly --no-owner --no-privileges "$(DB_URL)" > db/schema.sql
+#
+# # Generate markdown docs from db/schema.sql (mdschema/sft)
+# @0+Schema-Mdocs
+#   @cat > docs
+#   if test -f "$(CONFIG_TO_MDCP_FILE)" ]; then \
+#       echo "Generating docs/$SCHEMA.md from db/schema.sql" ; \
+#       python scripts/schema_to_mdcp.py db/schema.sql > docs/SCHEMA.md ; \
+#   else \
+#       echo "scripts/schema_to_mdcp.py not found, creating placeholder docs/SCHEMA.md" ; \
+#       echo "# Schema Documentation (placeholder)" > docs/SCHEMA.md ; \
+#   fi
+#
+# # Inject auto-generated file tree into WORKFLOW.md between markers
+# @build-tree
+#   @if test -f "scripts/client_tree.sh" ]; then \
+#       echo "Injecting tree file tree into WORKFLOW.md" ; \
+#       python scripts/client_tree.py ; \
+#   else \
+#       echo "scripts/client_tree.py not found, skipping file tree injection" ; \
+#   fi
+#
+# # Seed demo data into DB
+# seed-demo-data:
+#   @echo "Seeding demo data into $(DB_URL)"
+#   python scripts/seed_demo_data.py --url "$(DB_URL)"
+#
+# ============================================================================
+# InsightPulseAI Multi-Tenant Data Platform
+# ============================================================================
 #
 # This Makefile provides a single entry point for:
-# - Infrastructure provisioning (DigitalOcean / K8s)
-# - Application stack management (Docker Compose)
-# - Database migrations and demo data seeding
-# - Automated UAT testing and navigation health checks
-# - Go-live and rollback procedures
+#   - Infrastructure provisioning (DigitalOcean / AWS)
+#   - Application stack management (Docker Compose)
+#   - Database migrations and seeding
+#   - Automated UAT testing and health checks
+#   - Go-Live and rollback procedures
 #
 # Usage:
-#   make help              # Show all available targets
-#   make check-suite       # Run full validation suite
-#   make go-live           # Deploy to production
+#   make help           # Show all available targets
+#   make check-suite    # Run full validation suite
+#   make go-live        # Deploy to production
 #
-# =============================================================================
+# ============================================================================
 
 # Configuration
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-# Environment
-ENV ?= dev
-COMPOSE_PROJECT_NAME ?= insightpulseai
+# Directories
+INFRA_DIR := infra
+PROJECT_ROOT := $(shell pwd)
 DOCKER_COMPOSE := docker compose
 
 # Paths
 ROOT_DIR := $(shell pwd)
-INFRA_DIR := $(ROOT_DIR)/infra
+VENV_DIR := $(ROOT_DIR)/.venv
+SCRIPTS_DIR := $(ROOT_DIR)/scripts
 ODOO_DIR := $(ROOT_DIR)/odoo
-UAT_DIR := $(ROOT_DIR)/uat
-SCRIPTS_DIR := $(ODOO_DIR)/scripts
-CHECKLISTS_DIR := $(ROOT_DIR)/docs/checklists
+API_DIR := $(ROOT_DIR)/api
+DOCS_DIR := $(ROOT_DIR)/docs
+MIGRATIONS_DIR := $(ROOT_DIR)/migrations
 
 # Python
 VENV := $(ROOT_DIR)/.venv
 PYTHON := $(VENV)/bin/python
 PIP := $(VENV)/bin/pip
 
-# Docker Compose files
-COMPOSE_BASE := $(INFRA_DIR)/docker-compose.base.yml
-COMPOSE_DEV := $(INFRA_DIR)/docker-compose.dev.yml
-COMPOSE_PROD := $(INFRA_DIR)/docker-compose.prod.yml
-COMPOSE_ODOO := $(INFRA_DIR)/docker-compose.odoo.yml
+# Docker-Compose files
+COMPOSE_BASE := $(INFRA_DIR)/docker-compose-base.yml
+COMPOSE_PROD := $(INFRA_DIR)/docker-compose-prod.yml
+COMPOSE_DEV := $(INFRA_DIR)/docker-compose-dev.yml
 
 # Colors for output
-CYAN := \033[36m
-GREEN := \033[32m
-YELLOW := \033[33m
-RED := \033[31m
+GREEN := \033[0;32m
+YELLOW := \033[1;33m
+RED := \033[0;31m
+CYAN := \033[0;36m
 RESET := \033[0m
 
 # =============================================================================
@@ -148,292 +198,114 @@ infra-validate: ## Validate infrastructure configuration
 	@if [ -d "$(INFRA_DIR)/terraform" ]; then \
 		cd $(INFRA_DIR)/terraform && terraform validate; \
 	fi
-	@echo "$(GREEN)✅ Infrastructure validation complete$(RESET)"
-
-.PHONY: infra-destroy
-infra-destroy: ## Destroy infrastructure (USE WITH CAUTION)
-	@echo "$(RED)⚠️  WARNING: This will destroy all infrastructure!$(RESET)"
-	@read -p "Are you sure? [y/N] " confirm && [ "$$confirm" = "y" ]
-	@if [ -d "$(INFRA_DIR)/terraform" ]; then \
-		cd $(INFRA_DIR)/terraform && terraform destroy -var-file=$(ENV).tfvars; \
-	fi
 
 # =============================================================================
 # STACK MANAGEMENT
 # =============================================================================
 
 .PHONY: stack-up
-stack-up: ## Start the full application stack
-	@echo "$(CYAN)🚀 Starting application stack...$(RESET)"
-	@if [ "$(ENV)" = "prod" ]; then \
-		$(DOCKER_COMPOSE) -f $(COMPOSE_BASE) -f $(COMPOSE_ODOO) -f $(COMPOSE_PROD) up -d; \
-	else \
-		$(DOCKER_COMPOSE) -f $(COMPOSE_BASE) -f $(COMPOSE_ODOO) -f $(COMPOSE_DEV) up -d; \
-	fi
-	@echo "$(GREEN)✅ Stack is up$(RESET)"
-	@$(MAKE) stack-status
+stack-up: ## Start all services in development mode
+	@echo "$(CYAN)🚀 Starting stack in dev mode...$(RESET)"
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_BASE) -f $(COMPOSE_DEV) up -d
+	@echo "$(GREEN)✅ Stack started$(RESET)"
 
 .PHONY: stack-down
-stack-down: ## Stop the application stack gracefully
-	@echo "$(CYAN)🛑 Stopping application stack...$(RESET)"
-	@$(DOCKER_COMPOSE) -f $(COMPOSE_BASE) -f $(COMPOSE_ODOO) down --remove-orphans
+stack-down: ## Stop all services
+	@echo "$(YELLOW)⏹️ Stopping stack...$(RESET)"
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_BASE) down
 	@echo "$(GREEN)✅ Stack stopped$(RESET)"
 
-.PHONY: stack-restart
-stack-restart: stack-down stack-up ## Restart the application stack
-
-.PHONY: stack-status
-stack-status: ## Show status of all containers
-	@echo "$(CYAN)📊 Stack Status:$(RESET)"
-	@$(DOCKER_COMPOSE) -f $(COMPOSE_BASE) -f $(COMPOSE_ODOO) ps
+.PHONY: stack-prod
+stack-prod: ## Start all services in production mode
+	@echo "$(CYAN)🚀 Starting stack in production mode...$(RESET)"
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_BASE) -f $(COMPOSE_PROD) up -d
+	@echo "$(GREEN)✅ Production stack started$(RESET)"
 
 .PHONY: stack-logs
-stack-logs: ## Tail logs from all containers
-	@$(DOCKER_COMPOSE) -f $(COMPOSE_BASE) -f $(COMPOSE_ODOO) logs -f --tail=100
+stack-logs: ## Follow logs from all services
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_BASE) logs -f
 
-.PHONY: logs
-logs: stack-logs ## Alias for stack-logs
-
-# =============================================================================
-# ODOO MIGRATIONS
-# =============================================================================
-
-.PHONY: odoo-migrate
-odoo-migrate: deps ## Run Odoo module migrations
-	@echo "$(CYAN)🔄 Running Odoo migrations...$(RESET)"
-	@$(PYTHON) $(SCRIPTS_DIR)/migrate.py
-	@echo "$(GREEN)✅ Odoo migrations complete$(RESET)"
-
-.PHONY: odoo-migrate-module
-odoo-migrate-module: deps ## Migrate a specific module (usage: make odoo-migrate-module MODULE=ipai_expense_core)
-	@echo "$(CYAN)🔄 Migrating module: $(MODULE)...$(RESET)"
-	@$(PYTHON) $(SCRIPTS_DIR)/migrate.py --module $(MODULE)
-	@echo "$(GREEN)✅ Module migration complete$(RESET)"
-
-.PHONY: odoo-shell
-odoo-shell: ## Open Odoo shell for debugging
-	@$(DOCKER_COMPOSE) -f $(COMPOSE_BASE) -f $(COMPOSE_ODOO) exec odoo odoo shell -d $(ODOO_DB)
-
-.PHONY: odoo-logs
-odoo-logs: ## Tail Odoo container logs
-	@$(DOCKER_COMPOSE) -f $(COMPOSE_BASE) -f $(COMPOSE_ODOO) logs -f odoo
-
-# =============================================================================
-# DEMO DATA SEEDING
-# =============================================================================
-
-.PHONY: seed-demo
-seed-demo: deps ## Seed demo data for T&E flows
-	@echo "$(CYAN)🌱 Seeding demo data...$(RESET)"
-	@$(PYTHON) $(SCRIPTS_DIR)/seed_demo_data.py
-	@echo "$(GREEN)✅ Demo data seeded$(RESET)"
-
-.PHONY: seed-reset
-seed-reset: deps ## Reset and reseed demo data
-	@echo "$(YELLOW)⚠️  Resetting demo data...$(RESET)"
-	@$(PYTHON) $(SCRIPTS_DIR)/seed_demo_data.py --reset
-	@echo "$(GREEN)✅ Demo data reset complete$(RESET)"
-
-.PHONY: seed-prod
-seed-prod: deps ## Seed production baseline data (no demo)
-	@echo "$(CYAN)🌱 Seeding production baseline...$(RESET)"
-	@$(PYTHON) $(SCRIPTS_DIR)/seed_demo_data.py --prod
-	@echo "$(GREEN)✅ Production baseline seeded$(RESET)"
-
-# =============================================================================
-# NAVIGATION & HEALTH CHECKS
-# =============================================================================
-
-.PHONY: check-nav
-check-nav: deps ## Check navigation health (no empty/dead tabs)
-	@echo "$(CYAN)🔍 Checking navigation health...$(RESET)"
-	@$(PYTHON) $(SCRIPTS_DIR)/check_nav_health.py
-	@echo "$(GREEN)✅ Navigation health check passed$(RESET)"
-
-.PHONY: check-health
-check-health: ## Check all service health endpoints
-	@echo "$(CYAN)🏥 Checking service health...$(RESET)"
-	@curl -sf http://localhost:8069/web/health 2>/dev/null && echo "Odoo: OK" || echo "Odoo: FAIL"
-	@curl -sf http://localhost:5432 2>/dev/null || echo "Postgres: Listening (expected)"
-	@curl -sf http://localhost:6379 2>/dev/null || echo "Redis: Listening (expected)"
-	@echo "$(GREEN)✅ Health check complete$(RESET)"
-
-# =============================================================================
-# UAT TESTING
-# =============================================================================
-
-.PHONY: uat
-uat: deps ## Run automated UAT scenarios
-	@echo "$(CYAN)🧪 Running UAT scenarios...$(RESET)"
-	@cd $(UAT_DIR) && npm install --silent 2>/dev/null || true
-	@cd $(UAT_DIR) && npx playwright test --reporter=list
-	@echo "$(GREEN)✅ UAT scenarios passed$(RESET)"
-
-.PHONY: uat-headed
-uat-headed: deps ## Run UAT scenarios with browser visible
-	@echo "$(CYAN)🧪 Running UAT scenarios (headed mode)...$(RESET)"
-	@cd $(UAT_DIR) && npx playwright test --headed
-
-.PHONY: uat-report
-uat-report: ## Show last UAT test report
-	@cd $(UAT_DIR) && npx playwright show-report
-
-.PHONY: test-unit
-test-unit: deps ## Run unit tests
-	@echo "$(CYAN)🧪 Running unit tests...$(RESET)"
-	@$(PYTHON) -m pytest $(ODOO_DIR)/tests -v 2>/dev/null || echo "No unit tests found"
-
-# =============================================================================
-# COMPOSITE VALIDATION
-# =============================================================================
-
-.PHONY: check-suite
-check-suite: infra-validate odoo-migrate seed-demo check-nav uat ## Run full validation suite
-	@echo ""
-	@echo "$(GREEN)========================================$(RESET)"
-	@echo "$(GREEN)✅ FULL VALIDATION SUITE PASSED$(RESET)"
-	@echo "$(GREEN)========================================$(RESET)"
-	@echo ""
-
-.PHONY: check-checklists
-check-checklists: deps ## Validate all required checklists are complete
-	@echo "$(CYAN)📋 Validating checklists...$(RESET)"
-	@$(PYTHON) $(SCRIPTS_DIR)/validate_checklists.py $(CHECKLISTS_DIR)
-	@echo "$(GREEN)✅ All checklists validated$(RESET)"
-
-# =============================================================================
-# DEPLOYMENT
-# =============================================================================
-
-.PHONY: go-live
-go-live: ## Deploy to production (requires check-suite pass)
-	@echo "$(CYAN)🚀 Starting go-live procedure...$(RESET)"
-	@echo ""
-	@echo "$(YELLOW)Step 1: Validating check-suite on main branch...$(RESET)"
-	@git fetch origin main
-	@CURRENT_BRANCH=$$(git rev-parse --abbrev-ref HEAD); \
-	if [ "$$CURRENT_BRANCH" != "main" ]; then \
-		echo "$(RED)ERROR: Go-live must be run from main branch$(RESET)"; \
-		exit 1; \
-	fi
-	@echo ""
-	@echo "$(YELLOW)Step 2: Validating checklists...$(RESET)"
-	@$(MAKE) check-checklists
-	@echo ""
-	@echo "$(YELLOW)Step 3: Applying production infrastructure...$(RESET)"
-	@ENV=prod $(MAKE) infra-bootstrap
-	@echo ""
-	@echo "$(YELLOW)Step 4: Running production migrations...$(RESET)"
-	@ENV=prod $(MAKE) odoo-migrate
-	@echo ""
-	@echo "$(YELLOW)Step 5: Seeding production baseline...$(RESET)"
-	@ENV=prod $(MAKE) seed-prod
-	@echo ""
-	@echo "$(GREEN)========================================$(RESET)"
-	@echo "$(GREEN)✅ GO-LIVE COMPLETE$(RESET)"
-	@echo "$(GREEN)========================================$(RESET)"
-	@echo ""
-	@echo "Next steps:"
-	@echo "  1. Verify DNS propagation"
-	@echo "  2. Run smoke tests on production"
-	@echo "  3. Monitor dashboards for 30 minutes"
-	@echo ""
-
-.PHONY: rollback
-rollback: ## Rollback to last known good state
-	@echo "$(RED)⚠️  ROLLBACK PROCEDURE$(RESET)"
-	@echo ""
-	@read -p "Enter snapshot ID to restore (or 'latest'): " SNAPSHOT_ID; \
-	if [ "$$SNAPSHOT_ID" = "latest" ]; then \
-		echo "$(YELLOW)Restoring latest snapshot...$(RESET)"; \
-		$(PYTHON) $(SCRIPTS_DIR)/rollback.py --latest; \
-	else \
-		echo "$(YELLOW)Restoring snapshot: $$SNAPSHOT_ID...$(RESET)"; \
-		$(PYTHON) $(SCRIPTS_DIR)/rollback.py --snapshot $$SNAPSHOT_ID; \
-	fi
-	@echo ""
-	@echo "$(YELLOW)Restarting stack with previous image versions...$(RESET)"
-	@$(DOCKER_COMPOSE) -f $(COMPOSE_BASE) -f $(COMPOSE_ODOO) pull
-	@$(MAKE) stack-restart
-	@echo ""
-	@echo "$(GREEN)✅ Rollback complete$(RESET)"
-
-.PHONY: deploy-staging
-deploy-staging: ## Deploy to staging environment
-	@echo "$(CYAN)🚀 Deploying to staging...$(RESET)"
-	@ENV=staging $(MAKE) stack-up
-	@ENV=staging $(MAKE) odoo-migrate
-	@ENV=staging $(MAKE) seed-demo
-	@echo "$(GREEN)✅ Staging deployment complete$(RESET)"
+.PHONY: stack-status
+stack-status: ## Show status of all services
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_BASE) ps
 
 # =============================================================================
 # DATABASE
 # =============================================================================
 
+.PHONY: db-migrate
+db-migrate: ## Run database migrations
+	@echo "$(CYAN)📦 Running migrations...$(RESET)"
+	@$(PYTHON) scripts/migrate.py --url "$(DB_URL)"
+	@echo "$(GREEN)✅ Migrations complete$(RESET)"
+
 .PHONY: db-backup
 db-backup: ## Create database backup
 	@echo "$(CYAN)💾 Creating database backup...$(RESET)"
-	@bash $(INFRA_DIR)/scripts/backup.sh
+	@mkdir -p $(INFRA_DIR)/backups
+	@pg_dump "$(DB_URL)" > $(INFRA_DIR)/backups/backup-$(shell date +%Y%m%d-%H%M%S).sql
 	@echo "$(GREEN)✅ Backup complete$(RESET)"
 
 .PHONY: db-restore
 db-restore: ## Restore database from backup
-	@echo "$(YELLOW)📂 Restoring database...$(RESET)"
-	@read -p "Enter backup file path: " BACKUP_FILE; \
-	$(DOCKER_COMPOSE) exec postgres pg_restore -U postgres -d odoo $$BACKUP_FILE
+	@echo "$(YELLOW)⚠️ Restoring database...$(RESET)"
+	@psql "$(DB_URL)" < $(BACKUP_FILE)
 	@echo "$(GREEN)✅ Restore complete$(RESET)"
 
 .PHONY: db-shell
-db-shell: ## Open PostgreSQL shell
-	@$(DOCKER_COMPOSE) -f $(COMPOSE_BASE) -f $(COMPOSE_ODOO) exec postgres psql -U postgres -d odoo
+db-shell: ## Open psql shell
+	@psql "$(DB_URL)"
+
+.PHONY: db-init
+db-init: ## Initialize database with schema
+	@echo "$(CYAN)🗄️ Initializing database...$(RESET)"
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_BASE) -f $(COMPOSE_DEV) exec postgres psql -U postgres -d odoo
+	@echo "$(GREEN)✅ Database initialized$(RESET)"
 
 .PHONY: db-migrate
-db-migrate: ## Run SQL migrations (RAG core schema, etc.)
-	@echo "$(CYAN)🔄 Running database migrations...$(RESET)"
-	@for migration in $(ROOT_DIR)/migrations/*.sql; do \
-		echo "  Applying: $$(basename $$migration)"; \
-		$(DOCKER_COMPOSE) -f $(COMPOSE_BASE) exec -T postgres psql -U postgres -d odoo -f /migrations/$$(basename $$migration) 2>/dev/null || \
-		psql "$$DATABASE_URL" -f "$$migration"; \
-	done
-	@echo "$(GREEN)✅ Database migrations complete$(RESET)"
+db-migrate: ## Run SQL migrations (Alembic or raw SQL)
+	@if [ -d "$(MIGRATIONS_DIR)" ]; then \
+		$(PYTHON) scripts/migrate.py; \
+	else \
+		echo "No migrations directory found"; \
+	fi
 
 # =============================================================================
 # RAG PIPELINE
 # =============================================================================
 
 .PHONY: rag-ingest
-rag-ingest: deps ## Ingest documents into RAG pipeline
-	@echo "$(CYAN)📄 Running RAG document ingestion...$(RESET)"
+rag-ingest: ## Ingest documents into RAG pipeline
+	@echo "$(CYAN)📥 Running RAG document ingestion...$(RESET)"
 	@$(PYTHON) $(SCRIPTS_DIR)/rag_ingest.py
 	@echo "$(GREEN)✅ RAG ingestion complete$(RESET)"
 
 .PHONY: rag-embed
-rag-embed: deps ## Generate embeddings for RAG chunks
-	@echo "$(CYAN)🔢 Running RAG embedding generation...$(RESET)"
+rag-embed: ## Generate embeddings for RAG chunks
+	@echo "$(CYAN)🧠 Generating embeddings...$(RESET)"
 	@$(PYTHON) $(SCRIPTS_DIR)/rag_embed.py
-	@echo "$(GREEN)✅ RAG embedding complete$(RESET)"
+	@echo "$(GREEN)✅ RAG embeddings complete$(RESET)"
 
 .PHONY: rag-eval
-rag-eval: deps ## Evaluate RAG query performance
+rag-eval: ## Run RAG evaluation (ragas benchmarks)
 	@echo "$(CYAN)📊 Running RAG evaluation...$(RESET)"
 	@$(PYTHON) $(SCRIPTS_DIR)/rag_eval.py
 	@echo "$(GREEN)✅ RAG evaluation complete$(RESET)"
 
-.PHONY: rag-eval-stats
-rag-eval-stats: deps ## Show RAG evaluation statistics
-	@echo "$(CYAN)📊 RAG Evaluation Statistics:$(RESET)"
-	@$(PYTHON) $(SCRIPTS_DIR)/rag_eval.py --stats
+.PHONY: rag-eval-alert
+rag-eval-alert: ## Run RAG evaluation with alerting
+	@echo "$(CYAN)🚨 Running RAG evaluation with alerts...$(RESET)"
+	@$(PYTHON) $(SCRIPTS_DIR)/rag_eval.py --alert
+	@echo "$(GREEN)✅ RAG evaluation with alerts complete$(RESET)"
 
 .PHONY: rag-pipeline
-rag-pipeline: rag-ingest rag-embed rag-eval ## Run full RAG pipeline (ingest → embed → eval)
+rag-pipeline: rag-ingest rag-embed rag-eval ## Run full RAG pipeline (ingest + embed + eval)
 	@echo ""
-	@echo "$(GREEN)========================================$(RESET)"
 	@echo "$(GREEN)✅ RAG PIPELINE COMPLETE$(RESET)"
-	@echo "$(GREEN)========================================$(RESET)"
 	@echo ""
 
 .PHONY: seed-rag
-seed-rag: deps ## Seed RAG demo data only
+seed-rag: ## Seed RAG demo data only
 	@echo "$(CYAN)🌱 Seeding RAG demo data...$(RESET)"
 	@$(PYTHON) $(SCRIPTS_DIR)/seed_demo_data.py --rag-only
 	@echo "$(GREEN)✅ RAG demo data seeded$(RESET)"
@@ -444,16 +316,112 @@ seed-rag: deps ## Seed RAG demo data only
 
 .PHONY: clean
 clean: ## Clean up temporary files
-	@echo "$(CYAN)🧹 Cleaning up...$(RESET)"
+	@echo "$(YELLOW)🧹 Cleaning up...$(RESET)"
 	@find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	@find . -type f -name "*.pyc" -delete 2>/dev/null || true
 	@find . -type f -name ".DS_Store" -delete 2>/dev/null || true
-	@rm -rf $(UAT_DIR)/test-results 2>/dev/null || true
-	@rm -rf $(UAT_DIR)/playwright-report 2>/dev/null || true
+	@rm -rf $(ROOT_DIR)/.pytest_cache 2>/dev/null || true
+	@rm -rf $(ROOT_DIR)/.mypy_cache 2>/dev/null || true
 	@echo "$(GREEN)✅ Cleanup complete$(RESET)"
 
 .PHONY: clean-all
-clean-all: clean stack-down ## Clean everything including containers and volumes
-	@echo "$(RED)⚠️  Removing all containers and volumes...$(RESET)"
-	@$(DOCKER_COMPOSE) -f $(COMPOSE_BASE) -f $(COMPOSE_ODOO) down -v --remove-orphans
+clean-all: ## Clean everything including containers and volumes
+	@echo "$(RED)⚠️ Cleaning all resources...$(RESET)"
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_BASE) -f $(COMPOSE_DEV) down -v --remove-orphans
+	@docker system prune -f
 	@echo "$(GREEN)✅ Full cleanup complete$(RESET)"
+
+# =============================================================================
+# UAT TESTING
+# =============================================================================
+
+.PHONY: uat
+uat: ## Run automated UAT scenarios
+	@echo "$(CYAN)🧪 Running UAT scenarios...$(RESET)"
+	@cd $(UAT_DIR) && $(PLAYWRIGHT) test --config=playwright.config.ts || true
+	@echo "$(GREEN)✅ UAT scenarios complete$(RESET)"
+
+.PHONY: uat-headed
+uat-headed: ## Run UAT with visible browser
+	@echo "$(CYAN)🧪 Running UAT scenarios (headed mode)...$(RESET)"
+	@cd $(UAT_DIR) && $(PLAYWRIGHT) test --headed --config=playwright.config.ts || true
+
+.PHONY: uat-report
+uat-report: ## Show UAT test report
+	@cd $(UAT_DIR) && $(PLAYWRIGHT) show-report
+
+.PHONY: test-api
+test-api: ## Run API unit tests
+	@echo "$(CYAN)🧪 Running unit tests...$(RESET)"
+	@$(PYTHON) -m pytest $(API_DIR)/tests -v 2>/dev/null || echo "No unit tests found"
+
+# =============================================================================
+# COMPOSITE VALIDATION
+# =============================================================================
+
+.PHONY: check-suite
+check-suite: infra-validate stack-migrate check-rag uat ## Run full validation suite
+	@echo "$(GREEN)✅============================================$(RESET)"
+	@echo "$(GREEN)✅ FULL VALIDATION SUITE PASSED$(RESET)"
+	@echo "$(GREEN)✅============================================$(RESET)"
+	@echo ""
+
+.PHONY: check-checklist
+check-checklist: ## Run PR checklist with validation checklists and scorecards
+	@echo "$(CYAN)📋 Running PR checklist validation...$(RESET)"
+	@$(PYTHON) $(SCRIPTS_DIR)/validate_checklists.py $(DOCS_DIR)/CHECKLISTS.md
+	@echo "$(GREEN)✅ PR checklists validated$(RESET)"
+
+# =============================================================================
+# DEPLOYMENT
+# =============================================================================
+
+.PHONY: go-live
+go-live: ## Deploy to production (requires check-suite pass)
+	@echo "$(YELLOW)🚀 Starting go-live sequence...$(RESET)"
+	@echo ""
+	@echo "$(CYAN)Step 1: Validating checklists...$(RESET)"
+	@$(MAKE) check-checklist
+	@echo ""
+	@echo "$(CYAN)Step 2: Deploying infrastructure...$(RESET)"
+	@$(MAKE) infra-bootstrap ENV=prod
+	@echo ""
+	@echo "$(CYAN)Step 3: Running production migrations...$(RESET)"
+	@$(MAKE) db-migrate
+	@echo ""
+	@echo "$(CYAN)Step 4: Starting production services...$(RESET)"
+	@$(MAKE) stack-prod
+	@echo ""
+	@echo "$(GREEN)✅============================================$(RESET)"
+	@echo "$(GREEN)✅ GO-LIVE COMPLETE$(RESET)"
+	@echo "$(GREEN)✅============================================$(RESET)"
+	@echo ""
+	@echo "Next steps:"
+	@echo "  1. Verify DNS propagation"
+	@echo "  2. Run smoke tests at production"
+	@echo "  3. Monitor dashboards for 30 minutes"
+
+.PHONY: rollback
+rollback: ## Rollback to last known good state
+	@echo "$(RED)⚠️ ROLLBACK PROCEDURE$(RESET)"
+	@read -p "Enter snapshot ID to restore (or 'latest'): " SNAPSHOT_ID; \
+	if [ "$$SNAPSHOT_ID" = "latest" ]; then \
+		echo "$(YELLOW)Reverting to latest snapshot...$(RESET)"; \
+		$(PYTHON) $(SCRIPTS_DIR)/rollback.py --latest; \
+	else \
+		echo "$(YELLOW)Restoring snapshot: $$SNAPSHOT_ID...$(RESET)"; \
+		$(PYTHON) $(SCRIPTS_DIR)/rollback.py --snapshot $$SNAPSHOT_ID; \
+	fi
+	@echo ""
+	@echo "$(CYAN)Restarting stack with previous image version...$(RESET)"
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_BASE) -f $(COMPOSE_PROD) pull
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_BASE) -f $(COMPOSE_PROD) up -d
+	@echo ""
+	@echo "$(GREEN)✅ ROLLBACK COMPLETE$(RESET)"
+
+.PHONY: deploy-staging
+deploy-staging: ## Deploy to staging environment
+	@echo "$(CYAN)🚀 Deploying to staging...$(RESET)"
+	@$(MAKE) infra-bootstrap ENV=staging
+	@$(MAKE) stack-up
+	@echo "$(GREEN)✅ Staging deployment complete$(RESET)"

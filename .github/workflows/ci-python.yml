@@ -1,0 +1,41 @@
+# .github/workflows/ci-python.yml
+name: CI - Python
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt || true
+          pip install -r requirements-dev.txt || true
+
+      - name: Lint (pylint optional)
+        run: |
+          if [ -d "archi_agent_framework" ]; then
+            pylint archi_agent_framework || true
+          else
+            echo "No archi_agent_framework/ package yet, skipping pylint."
+          fi
+
+      - name: Run tests
+        run: |
+          if [ -d "tests" ]; then
+            pytest
+          else
+            echo "No tests/ directory yet, skipping tests."
+          fi
