@@ -1,0 +1,84 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pulser-agent-framework"
+version = "0.1.0"
+description = "A comprehensive multi-language framework for building, orchestrating, and deploying AI agents"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "InsightPulseAI", email = "dev@insightpulseai.net" }
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+keywords = ["ai", "agents", "llm", "orchestration", "multi-agent"]
+
+dependencies = [
+    "pydantic>=2.0.0",
+    "httpx>=0.25.0",
+    "structlog>=23.0.0",
+    "tenacity>=8.0.0",
+    "python-dotenv>=1.0.0",
+    "typing-extensions>=4.8.0",
+]
+
+[project.optional-dependencies]
+openai = ["openai>=1.0.0"]
+azure = ["openai>=1.0.0", "azure-identity>=1.15.0"]
+anthropic = ["anthropic>=0.18.0"]
+ollama = ["ollama>=0.1.0"]
+redis = ["redis>=5.0.0"]
+all = [
+    "openai>=1.0.0",
+    "anthropic>=0.18.0",
+    "ollama>=0.1.0",
+    "redis>=5.0.0",
+    "azure-identity>=1.15.0",
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/Insightpulseai-net/pulser-agent-framework"
+Documentation = "https://github.com/Insightpulseai-net/pulser-agent-framework#readme"
+Repository = "https://github.com/Insightpulseai-net/pulser-agent-framework"
+Issues = "https://github.com/Insightpulseai-net/pulser-agent-framework/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pulser_agents"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310", "py311", "py312"]
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "I", "N", "W", "UP"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_return_any = true
+warn_unused_ignores = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
