@@ -1,0 +1,193 @@
+{
+  "name": "Google Docs → GitHub Sync",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute",
+              "minute": 15
+            }
+          ]
+        },
+        "triggerOn": "specificFolder",
+        "folderToWatch": "={{ $json.folderId }}",
+        "event": "fileUpdated",
+        "options": {}
+      },
+      "id": "google-drive-trigger",
+      "name": "Watch Google Drive",
+      "type": "n8n-nodes-base.googleDriveTrigger",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "GOOGLE_DRIVE_CREDENTIALS_ID",
+          "name": "Google Drive Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": "={{ $json.id }}",
+        "options": {
+          "googleFileConversion": {
+            "conversion": {
+              "docsToFormat": "text/html"
+            }
+          }
+        }
+      },
+      "id": "download-as-html",
+      "name": "Download as HTML",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [460, 300],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "GOOGLE_DRIVE_CREDENTIALS_ID",
+          "name": "Google Drive Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Convert HTML to Markdown\nconst html = $input.first().binary.data.toString();\n\n// Basic HTML to Markdown conversion\nlet md = html\n  .replace(/<style[^>]*>.*?<\\/style>/gis, '')\n  .replace(/<script[^>]*>.*?<\\/script>/gis, '')\n  .replace(/<h1[^>]*>(.*?)<\\/h1>/gi, '# $1\\n')\n  .replace(/<h2[^>]*>(.*?)<\\/h2>/gi, '## $1\\n')\n  .replace(/<h3[^>]*>(.*?)<\\/h3>/gi, '### $1\\n')\n  .replace(/<h4[^>]*>(.*?)<\\/h4>/gi, '#### $1\\n')\n  .replace(/<strong[^>]*>(.*?)<\\/strong>/gi, '**$1**')\n  .replace(/<b[^>]*>(.*?)<\\/b>/gi, '**$1**')\n  .replace(/<em[^>]*>(.*?)<\\/em>/gi, '*$1*')\n  .replace(/<i[^>]*>(.*?)<\\/i>/gi, '*$1*')\n  .replace(/<code[^>]*>(.*?)<\\/code>/gi, '`$1`')\n  .replace(/<br\\s*\\/?>/gi, '\\n')\n  .replace(/<p[^>]*>(.*?)<\\/p>/gi, '$1\\n\\n')\n  .replace(/<li[^>]*>(.*?)<\\/li>/gi, '- $1\\n')\n  .replace(/<ul[^>]*>/gi, '')\n  .replace(/<\\/ul>/gi, '\\n')\n  .replace(/<a[^>]*href=[\"']([^\"']*)[\"'][^>]*>(.*?)<\\/a>/gi, '[$2]($1)')\n  .replace(/<[^>]+>/g, '')\n  .replace(/&nbsp;/g, ' ')\n  .replace(/&amp;/g, '&')\n  .replace(/&lt;/g, '<')\n  .replace(/&gt;/g, '>')\n  .replace(/\\n{3,}/g, '\\n\\n')\n  .trim();\n\n// Add frontmatter\nconst now = new Date().toISOString();\nconst title = $('Watch Google Drive').first().json.name.replace(/\\..*$/, '');\nconst docId = $('Watch Google Drive').first().json.id;\n\nconst frontmatter = `---\ntitle: \"${title}\"\nsource: Google Docs\ndocument_id: \"${docId}\"\nsynced_at: \"${now}\"\n---\n\n`;\n\nconst footer = `\\n\\n---\\n\\n*Synced from Google Docs on ${now}*`;\n\nreturn [{\n  json: {\n    filename: title.toLowerCase().replace(/[^a-z0-9]+/g, '_') + '.md',\n    content: frontmatter + md + footer,\n    title: title,\n    docId: docId\n  }\n}];"
+      },
+      "id": "convert-to-markdown",
+      "name": "Convert to Markdown",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "operation": "createOrUpdate",
+        "owner": "Insightpulseai-net",
+        "repository": "pulser-agent-framework",
+        "filePath": "=docs/google-docs/{{ $json.filename }}",
+        "fileContent": "={{ $json.content }}",
+        "commitMessage": "=docs: sync {{ $json.title }} from Google Docs",
+        "branch": "claude/system-design-analysis-pVVIl",
+        "options": {}
+      },
+      "id": "push-to-github",
+      "name": "Push to GitHub",
+      "type": "n8n-nodes-base.github",
+      "typeVersion": 1,
+      "position": [900, 300],
+      "credentials": {
+        "githubApi": {
+          "id": "GITHUB_CREDENTIALS_ID",
+          "name": "GitHub Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "channel": "#docs-sync",
+        "text": "=📄 *Doc Synced to GitHub*\n\n*Document:* {{ $json.title }}\n*File:* `docs/google-docs/{{ $json.filename }}`\n*Time:* {{ $now.toISO() }}\n\n<https://github.com/Insightpulseai-net/pulser-agent-framework/blob/claude/system-design-analysis-pVVIl/docs/google-docs/{{ $json.filename }}|View on GitHub>",
+        "otherOptions": {}
+      },
+      "id": "notify-mattermost",
+      "name": "Notify Mattermost",
+      "type": "n8n-nodes-base.mattermost",
+      "typeVersion": 1,
+      "position": [1120, 300],
+      "credentials": {
+        "mattermostApi": {
+          "id": "MATTERMOST_CREDENTIALS_ID",
+          "name": "Mattermost"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "schema": "docs2code",
+        "table": "sync_logs",
+        "columns": "document_id,title,filename,synced_at,status",
+        "values": "={{ $json.docId }},{{ $json.title }},{{ $json.filename }},{{ $now.toISO() }},success"
+      },
+      "id": "log-to-supabase",
+      "name": "Log to Supabase",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1120, 480],
+      "credentials": {
+        "postgres": {
+          "id": "SUPABASE_CREDENTIALS_ID",
+          "name": "Supabase PostgreSQL"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Watch Google Drive": {
+      "main": [
+        [
+          {
+            "node": "Download as HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download as HTML": {
+      "main": [
+        [
+          {
+            "node": "Convert to Markdown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to Markdown": {
+      "main": [
+        [
+          {
+            "node": "Push to GitHub",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Push to GitHub": {
+      "main": [
+        [
+          {
+            "node": "Notify Mattermost",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log to Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "docs2code"
+    },
+    {
+      "name": "automation"
+    }
+  ],
+  "triggerCount": 1,
+  "updatedAt": "2025-12-30T00:00:00.000Z",
+  "versionId": "1"
+}
