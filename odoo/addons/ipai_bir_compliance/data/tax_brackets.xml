@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- 2024 Income Tax Brackets (TRAIN Law) -->
+        <!-- Reference: Republic Act No. 10963 (TRAIN Law) -->
+
+        <!-- Note: Tax brackets are hardcoded in Python for performance -->
+        <!-- This file serves as documentation and potential future use -->
+
+        <!--
+        Tax Bracket 1: 0%
+        - Annual Income: ≤ ₱250,000
+        - Tax: 0
+
+        Tax Bracket 2: 15%
+        - Annual Income: ₱250,001 - ₱400,000
+        - Tax: 15% of excess over ₱250,000
+
+        Tax Bracket 3: 20%
+        - Annual Income: ₱400,001 - ₱800,000
+        - Tax: ₱22,500 + 20% of excess over ₱400,000
+
+        Tax Bracket 4: 25%
+        - Annual Income: ₱800,001 - ₱2,000,000
+        - Tax: ₱102,500 + 25% of excess over ₱800,000
+
+        Tax Bracket 5: 30%
+        - Annual Income: ₱2,000,001 - ₱8,000,000
+        - Tax: ₱402,500 + 30% of excess over ₱2,000,000
+
+        Tax Bracket 6: 35%
+        - Annual Income: > ₱8,000,000
+        - Tax: ₱2,202,500 + 35% of excess over ₱8,000,000
+        -->
+
+        <!-- Sequence for BIR Forms -->
+        <record id="seq_bir_form" model="ir.sequence">
+            <field name="name">BIR Form Sequence</field>
+            <field name="code">bir.form</field>
+            <field name="prefix">BIR/%(year)s/</field>
+            <field name="padding">5</field>
+            <field name="number_next">1</field>
+            <field name="number_increment">1</field>
+        </record>
+
+        <record id="seq_bir_filing" model="ir.sequence">
+            <field name="name">BIR Filing Sequence</field>
+            <field name="code">bir.filing</field>
+            <field name="prefix">FILING/%(year)s/</field>
+            <field name="padding">4</field>
+            <field name="number_next">1</field>
+            <field name="number_increment">1</field>
+        </record>
+    </data>
+</odoo>

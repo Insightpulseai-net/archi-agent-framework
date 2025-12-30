@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- BIR Filing Form View -->
+    <record id="bir_filing_form" model="ir.ui.view">
+        <field name="name">bir.filing.form</field>
+        <field name="model">bir.filing</field>
+        <field name="arch" type="xml">
+            <form string="BIR Filing Batch">
+                <header>
+                    <button name="action_generate_forms" string="Generate Forms"
+                            type="object" class="btn-secondary"
+                            invisible="state != 'draft'"/>
+                    <button name="action_compute_all" string="Compute All"
+                            type="object" class="btn-primary"
+                            invisible="state != 'draft'"/>
+                    <button name="action_validate_all" string="Validate All"
+                            type="object" class="btn-primary"
+                            invisible="state != 'draft'"/>
+                    <button name="action_approve" string="Approve"
+                            type="object" class="btn-success"
+                            invisible="state != 'draft' or approver_id"/>
+                    <button name="action_submit_all" string="Submit All to BIR"
+                            type="object" class="btn-success"
+                            invisible="state != 'draft' or not approver_id"/>
+                    <button name="action_reset_draft" string="Reset to Draft"
+                            type="object"
+                            invisible="state in ('draft', 'completed')"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,processing,completed"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="%(action_bir_form)d" type="action"
+                                class="oe_stat_button" icon="fa-file-text-o"
+                                context="{'search_default_filing_id': active_id}">
+                            <field name="form_count" widget="statinfo" string="Forms"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" readonly="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Filing Details">
+                            <field name="company_id"/>
+                            <field name="filing_date"/>
+                            <field name="period_start"/>
+                            <field name="period_end"/>
+                        </group>
+                        <group string="Approval">
+                            <field name="preparer_id"/>
+                            <field name="approver_id"/>
+                            <field name="approval_date"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Totals">
+                            <field name="total_tax_due"/>
+                            <field name="total_penalties"/>
+                            <field name="total_amount_due" class="oe_subtotal_footer_separator"/>
+                        </group>
+                        <group string="Status">
+                            <field name="form_count"/>
+                            <field name="submitted_count"/>
+                            <field name="failed_count"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Forms" name="forms">
+                            <field name="form_ids">
+                                <tree>
+                                    <field name="name"/>
+                                    <field name="form_code"/>
+                                    <field name="tax_due"/>
+                                    <field name="total_amount_due"/>
+                                    <field name="state" widget="badge"/>
+                                </tree>
+                            </field>
+                        </page>
+                        <page string="Logs" name="logs">
+                            <group string="Submission Log">
+                                <field name="submission_log" readonly="1" nolabel="1"/>
+                            </group>
+                            <group string="Error Log" invisible="not error_log">
+                                <field name="error_log" readonly="1" nolabel="1"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_follower_ids"/>
+                    <field name="activity_ids"/>
+                    <field name="message_ids"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <!-- BIR Filing Tree View -->
+    <record id="bir_filing_tree" model="ir.ui.view">
+        <field name="name">bir.filing.tree</field>
+        <field name="model">bir.filing</field>
+        <field name="arch" type="xml">
+            <tree string="BIR Filing Batches">
+                <field name="name"/>
+                <field name="filing_date"/>
+                <field name="period_start"/>
+                <field name="period_end"/>
+                <field name="form_count"/>
+                <field name="total_amount_due" sum="Total"/>
+                <field name="preparer_id"/>
+                <field name="approver_id"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'completed'"
+                       decoration-info="state == 'processing'"
+                       decoration-danger="state == 'failed'"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- BIR Filing Search View -->
+    <record id="bir_filing_search" model="ir.ui.view">
+        <field name="name">bir.filing.search</field>
+        <field name="model">bir.filing</field>
+        <field name="arch" type="xml">
+            <search string="Search Filing Batches">
+                <field name="name"/>
+                <field name="preparer_id"/>
+                <field name="approver_id"/>
+                <filter name="filter_draft" string="Draft" domain="[('state', '=', 'draft')]"/>
+                <filter name="filter_completed" string="Completed" domain="[('state', '=', 'completed')]"/>
+                <filter name="filter_failed" string="Failed" domain="[('state', '=', 'failed')]"/>
+                <separator/>
+                <filter name="filter_my_filings" string="My Filings" domain="[('preparer_id', '=', uid)]"/>
+                <filter name="filter_pending_approval" string="Pending Approval" domain="[('approver_id', '=', False), ('state', '=', 'draft')]"/>
+                <group expand="0" string="Group By">
+                    <filter name="group_period" string="Period" context="{'group_by': 'period_end:month'}"/>
+                    <filter name="group_state" string="State" context="{'group_by': 'state'}"/>
+                    <filter name="group_preparer" string="Preparer" context="{'group_by': 'preparer_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Actions -->
+    <record id="action_bir_filing" model="ir.actions.act_window">
+        <field name="name">Filing Batches</field>
+        <field name="res_model">bir.filing</field>
+        <field name="view_mode">tree,form</field>
+        <field name="search_view_id" ref="bir_filing_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create your first filing batch
+            </p>
+            <p>
+                Batch generate and submit BIR forms for a period.
+            </p>
+        </field>
+    </record>
+</odoo>

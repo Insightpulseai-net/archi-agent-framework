@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Demo Employees with BIR data -->
+        <record id="demo_employee_1" model="hr.employee">
+            <field name="name">Juan dela Cruz</field>
+            <field name="bir_tin">123-456-789-000</field>
+            <field name="sss_number">12-3456789-0</field>
+            <field name="philhealth_number">12-123456789-1</field>
+            <field name="pagibig_number">1234-5678-9012</field>
+            <field name="tax_status">married</field>
+            <field name="is_minimum_wage_earner">False</field>
+        </record>
+
+        <record id="demo_employee_2" model="hr.employee">
+            <field name="name">Maria Santos</field>
+            <field name="bir_tin">987-654-321-000</field>
+            <field name="sss_number">98-7654321-0</field>
+            <field name="philhealth_number">98-987654321-1</field>
+            <field name="pagibig_number">9876-5432-1098</field>
+            <field name="tax_status">single</field>
+            <field name="is_minimum_wage_earner">False</field>
+        </record>
+
+        <record id="demo_employee_3" model="hr.employee">
+            <field name="name">Pedro Reyes</field>
+            <field name="bir_tin">555-666-777-000</field>
+            <field name="sss_number">55-5666777-0</field>
+            <field name="philhealth_number">55-555666777-1</field>
+            <field name="pagibig_number">5556-6677-7000</field>
+            <field name="tax_status">single</field>
+            <field name="is_minimum_wage_earner">True</field>
+        </record>
+
+        <!-- Demo Tax Calculations -->
+        <record id="demo_calc_1" model="bir.tax.calculation">
+            <field name="employee_id" ref="demo_employee_1"/>
+            <field name="gross_salary">50000.00</field>
+            <field name="calculation_date" eval="time.strftime('%Y-%m-15')"/>
+            <field name="state">calculated</field>
+        </record>
+
+        <record id="demo_calc_2" model="bir.tax.calculation">
+            <field name="employee_id" ref="demo_employee_2"/>
+            <field name="gross_salary">35000.00</field>
+            <field name="calculation_date" eval="time.strftime('%Y-%m-15')"/>
+            <field name="state">calculated</field>
+        </record>
+
+        <record id="demo_calc_3" model="bir.tax.calculation">
+            <field name="employee_id" ref="demo_employee_3"/>
+            <field name="gross_salary">15860.00</field>
+            <field name="is_minimum_wage_earner">True</field>
+            <field name="calculation_date" eval="time.strftime('%Y-%m-15')"/>
+            <field name="state">calculated</field>
+        </record>
+    </data>
+</odoo>

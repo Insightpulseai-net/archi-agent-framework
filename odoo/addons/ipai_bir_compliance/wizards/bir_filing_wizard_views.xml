@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- BIR Filing Wizard Form View -->
+    <record id="bir_filing_wizard_form" model="ir.ui.view">
+        <field name="name">bir.filing.wizard.form</field>
+        <field name="model">bir.filing.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Create Filing Batch">
+                <group>
+                    <field name="company_id"/>
+                    <field name="period_type"/>
+                    <field name="period_month" invisible="period_type != 'monthly'"/>
+                    <field name="period_quarter" invisible="period_type != 'quarterly'"/>
+                    <field name="period_year"/>
+                </group>
+                <group string="Form Selection">
+                    <field name="include_1601c"/>
+                    <field name="include_2550m"/>
+                    <field name="include_2550q" invisible="period_type != 'quarterly'"/>
+                </group>
+                <footer>
+                    <button name="action_create_filing" string="Create Filing Batch"
+                            type="object" class="btn-primary"/>
+                    <button string="Cancel" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Action -->
+    <record id="action_bir_filing_wizard" model="ir.actions.act_window">
+        <field name="name">Create Filing Batch</field>
+        <field name="res_model">bir.filing.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <!-- Add to menu -->
+    <menuitem id="menu_bir_filing_wizard"
+              name="Create Filing Batch"
+              parent="menu_bir_forms"
+              action="action_bir_filing_wizard"
+              sequence="5"/>
+</odoo>

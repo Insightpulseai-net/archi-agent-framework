@@ -1,0 +1,297 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- Income Tax Forms -->
+        <record id="form_type_1700" model="bir.form.type">
+            <field name="name">Annual Income Tax Return (Individual)</field>
+            <field name="code">1700</field>
+            <field name="sequence">10</field>
+            <field name="category">income_tax</field>
+            <field name="frequency">annual</field>
+            <field name="deadline_day">15</field>
+            <field name="deadline_offset">following_year</field>
+            <field name="description">Annual income tax return for individuals earning purely compensation income.</field>
+        </record>
+
+        <record id="form_type_1701" model="bir.form.type">
+            <field name="name">Annual Income Tax Return (Self-Employed)</field>
+            <field name="code">1701</field>
+            <field name="sequence">11</field>
+            <field name="category">income_tax</field>
+            <field name="frequency">annual</field>
+            <field name="deadline_day">15</field>
+            <field name="deadline_offset">following_year</field>
+            <field name="description">Annual income tax return for self-employed individuals, estates, and trusts.</field>
+        </record>
+
+        <record id="form_type_1701a" model="bir.form.type">
+            <field name="name">Annual Income Tax Return (8% Tax Option)</field>
+            <field name="code">1701A</field>
+            <field name="sequence">12</field>
+            <field name="category">income_tax</field>
+            <field name="frequency">annual</field>
+            <field name="deadline_day">15</field>
+            <field name="deadline_offset">following_year</field>
+            <field name="description">Annual income tax return for those who opted for 8% income tax rate.</field>
+        </record>
+
+        <record id="form_type_1702rt" model="bir.form.type">
+            <field name="name">Annual Income Tax Return (Corporation - Regular)</field>
+            <field name="code">1702-RT</field>
+            <field name="sequence">13</field>
+            <field name="category">income_tax</field>
+            <field name="frequency">annual</field>
+            <field name="deadline_day">15</field>
+            <field name="deadline_offset">following_year</field>
+            <field name="description">Annual income tax return for corporations subject to regular income tax.</field>
+        </record>
+
+        <record id="form_type_1702ex" model="bir.form.type">
+            <field name="name">Annual Income Tax Return (Corporation - Exempt)</field>
+            <field name="code">1702-EX</field>
+            <field name="sequence">14</field>
+            <field name="category">income_tax</field>
+            <field name="frequency">annual</field>
+            <field name="deadline_day">15</field>
+            <field name="deadline_offset">following_year</field>
+            <field name="description">Annual income tax return for exempt corporations.</field>
+        </record>
+
+        <record id="form_type_1702mx" model="bir.form.type">
+            <field name="name">Annual Income Tax Return (Corporation - Mixed)</field>
+            <field name="code">1702-MX</field>
+            <field name="sequence">15</field>
+            <field name="category">income_tax</field>
+            <field name="frequency">annual</field>
+            <field name="deadline_day">15</field>
+            <field name="deadline_offset">following_year</field>
+            <field name="description">Annual income tax return for corporations with mixed income.</field>
+        </record>
+
+        <!-- Withholding Tax Forms -->
+        <record id="form_type_1601c" model="bir.form.type">
+            <field name="name">Monthly Withholding Tax on Compensation</field>
+            <field name="code">1601-C</field>
+            <field name="sequence">20</field>
+            <field name="category">withholding_tax</field>
+            <field name="frequency">monthly</field>
+            <field name="deadline_day">10</field>
+            <field name="deadline_offset">following_month</field>
+            <field name="description">Monthly remittance of withholding tax on compensation.</field>
+        </record>
+
+        <record id="form_type_1601eq" model="bir.form.type">
+            <field name="name">Quarterly Expanded Withholding Tax</field>
+            <field name="code">1601-EQ</field>
+            <field name="sequence">21</field>
+            <field name="category">withholding_tax</field>
+            <field name="frequency">quarterly</field>
+            <field name="deadline_day">25</field>
+            <field name="deadline_offset">following_quarter</field>
+            <field name="description">Quarterly remittance of expanded withholding tax.</field>
+        </record>
+
+        <record id="form_type_1601fq" model="bir.form.type">
+            <field name="name">Quarterly Final Withholding Tax</field>
+            <field name="code">1601-FQ</field>
+            <field name="sequence">22</field>
+            <field name="category">withholding_tax</field>
+            <field name="frequency">quarterly</field>
+            <field name="deadline_day">25</field>
+            <field name="deadline_offset">following_quarter</field>
+            <field name="description">Quarterly remittance of final withholding tax.</field>
+        </record>
+
+        <record id="form_type_1602" model="bir.form.type">
+            <field name="name">Monthly Remittance of Creditable Income Taxes Withheld</field>
+            <field name="code">1602</field>
+            <field name="sequence">23</field>
+            <field name="category">withholding_tax</field>
+            <field name="frequency">monthly</field>
+            <field name="deadline_day">10</field>
+            <field name="deadline_offset">following_month</field>
+            <field name="description">Monthly remittance of creditable income taxes withheld.</field>
+        </record>
+
+        <record id="form_type_1603" model="bir.form.type">
+            <field name="name">Quarterly Remittance of Final Income Taxes Withheld</field>
+            <field name="code">1603</field>
+            <field name="sequence">24</field>
+            <field name="category">withholding_tax</field>
+            <field name="frequency">quarterly</field>
+            <field name="deadline_day">25</field>
+            <field name="deadline_offset">following_quarter</field>
+            <field name="description">Quarterly remittance of final income taxes withheld on fringe benefits.</field>
+        </record>
+
+        <record id="form_type_1604cf" model="bir.form.type">
+            <field name="name">Annual Info Return of Income Tax Withheld on Compensation</field>
+            <field name="code">1604-CF</field>
+            <field name="sequence">25</field>
+            <field name="category">withholding_tax</field>
+            <field name="frequency">annual</field>
+            <field name="deadline_day">31</field>
+            <field name="deadline_offset">following_year</field>
+            <field name="description">Annual information return of income taxes withheld on compensation and final withholding taxes.</field>
+        </record>
+
+        <!-- VAT Forms -->
+        <record id="form_type_2550m" model="bir.form.type">
+            <field name="name">Monthly VAT Declaration</field>
+            <field name="code">2550-M</field>
+            <field name="sequence">30</field>
+            <field name="category">vat</field>
+            <field name="frequency">monthly</field>
+            <field name="deadline_day">20</field>
+            <field name="deadline_offset">following_month</field>
+            <field name="description">Monthly value-added tax declaration.</field>
+        </record>
+
+        <record id="form_type_2550q" model="bir.form.type">
+            <field name="name">Quarterly VAT Return</field>
+            <field name="code">2550-Q</field>
+            <field name="sequence">31</field>
+            <field name="category">vat</field>
+            <field name="frequency">quarterly</field>
+            <field name="deadline_day">25</field>
+            <field name="deadline_offset">following_quarter</field>
+            <field name="description">Quarterly value-added tax return.</field>
+        </record>
+
+        <record id="form_type_2551q" model="bir.form.type">
+            <field name="name">Quarterly Percentage Tax Return</field>
+            <field name="code">2551-Q</field>
+            <field name="sequence">32</field>
+            <field name="category">vat</field>
+            <field name="frequency">quarterly</field>
+            <field name="deadline_day">25</field>
+            <field name="deadline_offset">following_quarter</field>
+            <field name="description">Quarterly percentage tax return for non-VAT registered taxpayers.</field>
+        </record>
+
+        <record id="form_type_2552" model="bir.form.type">
+            <field name="name">Percentage Tax Return for Transactions Involving Shares of Stock</field>
+            <field name="code">2552</field>
+            <field name="sequence">33</field>
+            <field name="category">vat</field>
+            <field name="frequency">as_needed</field>
+            <field name="deadline_day">5</field>
+            <field name="deadline_offset">within_30_days</field>
+            <field name="description">Percentage tax on sale of shares of stock listed and traded through local stock exchange.</field>
+        </record>
+
+        <record id="form_type_2553" model="bir.form.type">
+            <field name="name">Return of Percentage Tax Payable Under Special Laws</field>
+            <field name="code">2553</field>
+            <field name="sequence">34</field>
+            <field name="category">vat</field>
+            <field name="frequency">quarterly</field>
+            <field name="deadline_day">25</field>
+            <field name="deadline_offset">following_quarter</field>
+            <field name="description">Percentage tax return for common carriers, international carriers, etc.</field>
+        </record>
+
+        <!-- Documentary Stamp Tax -->
+        <record id="form_type_2000" model="bir.form.type">
+            <field name="name">Documentary Stamp Tax Declaration/Return</field>
+            <field name="code">2000</field>
+            <field name="sequence">40</field>
+            <field name="category">documentary</field>
+            <field name="frequency">as_needed</field>
+            <field name="deadline_day">5</field>
+            <field name="deadline_offset">within_30_days</field>
+            <field name="description">Documentary stamp tax declaration for taxable documents.</field>
+        </record>
+
+        <record id="form_type_2000ot" model="bir.form.type">
+            <field name="name">Documentary Stamp Tax Declaration/Return (One-Time)</field>
+            <field name="code">2000-OT</field>
+            <field name="sequence">41</field>
+            <field name="category">documentary</field>
+            <field name="frequency">one_time</field>
+            <field name="deadline_day">5</field>
+            <field name="deadline_offset">within_30_days</field>
+            <field name="description">One-time transaction documentary stamp tax.</field>
+        </record>
+
+        <!-- Capital Gains Tax -->
+        <record id="form_type_1706" model="bir.form.type">
+            <field name="name">Capital Gains Tax Return (Sale of Real Property)</field>
+            <field name="code">1706</field>
+            <field name="sequence">50</field>
+            <field name="category">capital_gains</field>
+            <field name="frequency">as_needed</field>
+            <field name="deadline_day">30</field>
+            <field name="deadline_offset">within_30_days</field>
+            <field name="description">Capital gains tax on sale of real property classified as capital asset.</field>
+        </record>
+
+        <record id="form_type_1707" model="bir.form.type">
+            <field name="name">Capital Gains Tax Return (Sale of Shares)</field>
+            <field name="code">1707</field>
+            <field name="sequence">51</field>
+            <field name="category">capital_gains</field>
+            <field name="frequency">as_needed</field>
+            <field name="deadline_day">30</field>
+            <field name="deadline_offset">within_30_days</field>
+            <field name="description">Capital gains tax on sale of shares of stock not traded in stock exchange.</field>
+        </record>
+
+        <!-- Transfer Taxes -->
+        <record id="form_type_1800" model="bir.form.type">
+            <field name="name">Donor's Tax Return</field>
+            <field name="code">1800</field>
+            <field name="sequence">60</field>
+            <field name="category">transfer</field>
+            <field name="frequency">as_needed</field>
+            <field name="deadline_day">30</field>
+            <field name="deadline_offset">within_30_days</field>
+            <field name="description">Donor's tax on gifts and donations.</field>
+        </record>
+
+        <record id="form_type_1801" model="bir.form.type">
+            <field name="name">Estate Tax Return</field>
+            <field name="code">1801</field>
+            <field name="sequence">61</field>
+            <field name="category">transfer</field>
+            <field name="frequency">one_time</field>
+            <field name="deadline_day">0</field>
+            <field name="deadline_offset">within_30_days</field>
+            <field name="description">Estate tax on transfer of properties upon death.</field>
+        </record>
+
+        <!-- Registration -->
+        <record id="form_type_1901" model="bir.form.type">
+            <field name="name">Application for Registration (Self-Employed)</field>
+            <field name="code">1901</field>
+            <field name="sequence">70</field>
+            <field name="category">registration</field>
+            <field name="frequency">one_time</field>
+            <field name="deadline_day">0</field>
+            <field name="deadline_offset">within_30_days</field>
+            <field name="description">Application for registration for self-employed and mixed income individuals.</field>
+        </record>
+
+        <record id="form_type_1903" model="bir.form.type">
+            <field name="name">Application for Registration (Corporations)</field>
+            <field name="code">1903</field>
+            <field name="sequence">71</field>
+            <field name="category">registration</field>
+            <field name="frequency">one_time</field>
+            <field name="deadline_day">0</field>
+            <field name="deadline_offset">within_30_days</field>
+            <field name="description">Application for registration for corporations/partnerships.</field>
+        </record>
+
+        <record id="form_type_1905" model="bir.form.type">
+            <field name="name">Application for Registration Update</field>
+            <field name="code">1905</field>
+            <field name="sequence">72</field>
+            <field name="category">registration</field>
+            <field name="frequency">as_needed</field>
+            <field name="deadline_day">0</field>
+            <field name="deadline_offset">within_30_days</field>
+            <field name="description">Application for registration information update.</field>
+        </record>
+    </data>
+</odoo>

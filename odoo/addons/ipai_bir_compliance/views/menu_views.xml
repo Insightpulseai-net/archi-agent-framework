@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Main Menu -->
+    <menuitem id="menu_bir_compliance_root"
+              name="BIR Compliance"
+              web_icon="ipai_bir_compliance,static/description/icon.png"
+              sequence="100"/>
+
+    <!-- Submenu: Tax Calculations -->
+    <menuitem id="menu_bir_calculations"
+              name="Tax Calculations"
+              parent="menu_bir_compliance_root"
+              sequence="10"/>
+
+    <menuitem id="menu_bir_tax_calculation"
+              name="Payroll Tax Calculations"
+              parent="menu_bir_calculations"
+              action="action_bir_tax_calculation"
+              sequence="10"/>
+
+    <!-- Submenu: Forms -->
+    <menuitem id="menu_bir_forms"
+              name="BIR Forms"
+              parent="menu_bir_compliance_root"
+              sequence="20"/>
+
+    <menuitem id="menu_bir_form"
+              name="All Forms"
+              parent="menu_bir_forms"
+              action="action_bir_form"
+              sequence="10"/>
+
+    <menuitem id="menu_bir_filing"
+              name="Filing Batches"
+              parent="menu_bir_forms"
+              action="action_bir_filing"
+              sequence="20"/>
+
+    <!-- Submenu: Configuration -->
+    <menuitem id="menu_bir_configuration"
+              name="Configuration"
+              parent="menu_bir_compliance_root"
+              sequence="90"/>
+
+    <menuitem id="menu_bir_form_type"
+              name="Form Types"
+              parent="menu_bir_configuration"
+              action="action_bir_form_type"
+              sequence="10"/>
+
+    <menuitem id="menu_bir_sss_table"
+              name="SSS Contribution Table"
+              parent="menu_bir_configuration"
+              action="action_bir_sss_contribution"
+              sequence="20"/>
+
+    <!-- SSS Contribution Action -->
+    <record id="action_bir_sss_contribution" model="ir.actions.act_window">
+        <field name="name">SSS Contribution Table</field>
+        <field name="res_model">bir.sss.contribution</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <!-- SSS Contribution Tree View -->
+    <record id="bir_sss_contribution_tree" model="ir.ui.view">
+        <field name="name">bir.sss.contribution.tree</field>
+        <field name="model">bir.sss.contribution</field>
+        <field name="arch" type="xml">
+            <tree string="SSS Contribution Table" editable="bottom">
+                <field name="salary_from"/>
+                <field name="salary_to"/>
+                <field name="monthly_salary_credit"/>
+                <field name="employee_share"/>
+                <field name="employer_share"/>
+                <field name="total_contribution"/>
+                <field name="ec_contribution"/>
+                <field name="year"/>
+                <field name="active"/>
+            </tree>
+        </field>
+    </record>
+</odoo>

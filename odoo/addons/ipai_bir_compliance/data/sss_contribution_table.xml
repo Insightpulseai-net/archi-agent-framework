@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+        <!-- SSS Contribution Table 2024 -->
+        <!-- Based on SSS Circular 2023-004 -->
+
+        <record id="sss_bracket_01" model="bir.sss.contribution">
+            <field name="salary_from">0</field>
+            <field name="salary_to">4249.99</field>
+            <field name="monthly_salary_credit">4000</field>
+            <field name="employee_share">180.00</field>
+            <field name="employer_share">380.00</field>
+            <field name="year">2024</field>
+        </record>
+
+        <record id="sss_bracket_02" model="bir.sss.contribution">
+            <field name="salary_from">4250</field>
+            <field name="salary_to">4749.99</field>
+            <field name="monthly_salary_credit">4500</field>
+            <field name="employee_share">202.50</field>
+            <field name="employer_share">427.50</field>
+            <field name="year">2024</field>
+        </record>
+
+        <record id="sss_bracket_03" model="bir.sss.contribution">
+            <field name="salary_from">4750</field>
+            <field name="salary_to">5249.99</field>
+            <field name="monthly_salary_credit">5000</field>
+            <field name="employee_share">225.00</field>
+            <field name="employer_share">475.00</field>
+            <field name="year">2024</field>
+        </record>
+
+        <record id="sss_bracket_04" model="bir.sss.contribution">
+            <field name="salary_from">5250</field>
+            <field name="salary_to">5749.99</field>
+            <field name="monthly_salary_credit">5500</field>
+            <field name="employee_share">247.50</field>
+            <field name="employer_share">522.50</field>
+            <field name="year">2024</field>
+        </record>
+
+        <record id="sss_bracket_05" model="bir.sss.contribution">
+            <field name="salary_from">5750</field>
+            <field name="salary_to">6249.99</field>
+            <field name="monthly_salary_credit">6000</field>
+            <field name="employee_share">270.00</field>
+            <field name="employer_share">570.00</field>
+            <field name="year">2024</field>
+        </record>
+
+        <record id="sss_bracket_10" model="bir.sss.contribution">
+            <field name="salary_from">9750</field>
+            <field name="salary_to">10249.99</field>
+            <field name="monthly_salary_credit">10000</field>
+            <field name="employee_share">450.00</field>
+            <field name="employer_share">950.00</field>
+            <field name="year">2024</field>
+        </record>
+
+        <record id="sss_bracket_15" model="bir.sss.contribution">
+            <field name="salary_from">14750</field>
+            <field name="salary_to">15249.99</field>
+            <field name="monthly_salary_credit">15000</field>
+            <field name="employee_share">675.00</field>
+            <field name="employer_share">1425.00</field>
+            <field name="year">2024</field>
+        </record>
+
+        <record id="sss_bracket_20" model="bir.sss.contribution">
+            <field name="salary_from">19750</field>
+            <field name="salary_to">20249.99</field>
+            <field name="monthly_salary_credit">20000</field>
+            <field name="employee_share">900.00</field>
+            <field name="employer_share">1900.00</field>
+            <field name="year">2024</field>
+        </record>
+
+        <record id="sss_bracket_25" model="bir.sss.contribution">
+            <field name="salary_from">24750</field>
+            <field name="salary_to">29749.99</field>
+            <field name="monthly_salary_credit">25000</field>
+            <field name="employee_share">1125.00</field>
+            <field name="employer_share">2375.00</field>
+            <field name="year">2024</field>
+        </record>
+
+        <record id="sss_bracket_30" model="bir.sss.contribution">
+            <field name="salary_from">29750</field>
+            <field name="salary_to">999999999</field>
+            <field name="monthly_salary_credit">30000</field>
+            <field name="employee_share">1350.00</field>
+            <field name="employer_share">2850.00</field>
+            <field name="year">2024</field>
+        </record>
+    </data>
+</odoo>

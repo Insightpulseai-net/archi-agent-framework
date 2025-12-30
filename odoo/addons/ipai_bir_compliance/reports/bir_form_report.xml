@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- BIR Form Report Template -->
+    <template id="report_bir_form_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <h2 class="text-center">
+                            BIR Form <t t-esc="doc.form_code"/>
+                        </h2>
+                        <h4 class="text-center text-muted">
+                            <t t-esc="doc.form_type_id.name"/>
+                        </h4>
+
+                        <div class="row mt-4">
+                            <div class="col-6">
+                                <table class="table table-sm">
+                                    <tr>
+                                        <th>Reference:</th>
+                                        <td><t t-esc="doc.name"/></td>
+                                    </tr>
+                                    <tr>
+                                        <th>TIN:</th>
+                                        <td><t t-esc="doc.tin"/></td>
+                                    </tr>
+                                    <tr>
+                                        <th>Registered Name:</th>
+                                        <td><t t-esc="doc.registered_name"/></td>
+                                    </tr>
+                                    <tr>
+                                        <th>RDO Code:</th>
+                                        <td><t t-esc="doc.rdo_code or '-'"/></td>
+                                    </tr>
+                                </table>
+                            </div>
+                            <div class="col-6">
+                                <table class="table table-sm">
+                                    <tr>
+                                        <th>Period Start:</th>
+                                        <td><t t-esc="doc.period_start" t-options='{"widget": "date"}'/></td>
+                                    </tr>
+                                    <tr>
+                                        <th>Period End:</th>
+                                        <td><t t-esc="doc.period_end" t-options='{"widget": "date"}'/></td>
+                                    </tr>
+                                    <tr>
+                                        <th>Due Date:</th>
+                                        <td><t t-esc="doc.due_date" t-options='{"widget": "date"}'/></td>
+                                    </tr>
+                                    <tr>
+                                        <th>Status:</th>
+                                        <td><t t-esc="doc.state"/></td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+
+                        <h5 class="mt-4">Tax Summary</h5>
+                        <table class="table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Description</th>
+                                    <th class="text-end">Amount (PHP)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Gross Amount</td>
+                                    <td class="text-end">
+                                        <t t-esc="'{:,.2f}'.format(doc.gross_amount)"/>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Taxable Amount</td>
+                                    <td class="text-end">
+                                        <t t-esc="'{:,.2f}'.format(doc.taxable_amount)"/>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Tax Due</td>
+                                    <td class="text-end">
+                                        <t t-esc="'{:,.2f}'.format(doc.tax_due)"/>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Less: Tax Credits</td>
+                                    <td class="text-end">
+                                        (<t t-esc="'{:,.2f}'.format(doc.tax_credits)"/>)
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Tax Payable</strong></td>
+                                    <td class="text-end">
+                                        <strong><t t-esc="'{:,.2f}'.format(doc.tax_payable)"/></strong>
+                                    </td>
+                                </tr>
+                                <tr t-if="doc.penalties">
+                                    <td>Add: Penalties</td>
+                                    <td class="text-end">
+                                        <t t-esc="'{:,.2f}'.format(doc.penalties)"/>
+                                    </td>
+                                </tr>
+                                <tr class="table-primary">
+                                    <td><strong>Total Amount Due</strong></td>
+                                    <td class="text-end">
+                                        <strong>PHP <t t-esc="'{:,.2f}'.format(doc.total_amount_due)"/></strong>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <t t-if="doc.confirmation_number">
+                            <h5 class="mt-4">E-Filing Information</h5>
+                            <table class="table table-sm">
+                                <tr>
+                                    <th>Confirmation Number:</th>
+                                    <td><t t-esc="doc.confirmation_number"/></td>
+                                </tr>
+                                <tr>
+                                    <th>Filing Date:</th>
+                                    <td><t t-esc="doc.filing_date" t-options='{"widget": "date"}'/></td>
+                                </tr>
+                            </table>
+                        </t>
+
+                        <div class="mt-5 text-center text-muted">
+                            <p>Generated by InsightPulseAI BIR Compliance Module</p>
+                            <p>This is a computer-generated document. No signature required.</p>
+                        </div>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+    <!-- Report Action -->
+    <record id="action_report_bir_form" model="ir.actions.report">
+        <field name="name">BIR Form</field>
+        <field name="model">bir.form</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">ipai_bir_compliance.report_bir_form_document</field>
+        <field name="report_file">ipai_bir_compliance.report_bir_form_document</field>
+        <field name="print_report_name">'BIR Form - %s' % (object.name)</field>
+        <field name="binding_model_id" ref="model_bir_form"/>
+        <field name="binding_type">report</field>
+    </record>
+</odoo>

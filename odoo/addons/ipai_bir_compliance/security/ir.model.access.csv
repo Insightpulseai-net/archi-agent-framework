@@ -1,0 +1,16 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_bir_tax_calculation_user,bir.tax.calculation.user,model_bir_tax_calculation,base.group_user,1,0,0,0
+access_bir_tax_calculation_manager,bir.tax.calculation.manager,model_bir_tax_calculation,account.group_account_manager,1,1,1,1
+access_bir_form_type_user,bir.form.type.user,model_bir_form_type,base.group_user,1,0,0,0
+access_bir_form_type_manager,bir.form.type.manager,model_bir_form_type,account.group_account_manager,1,1,1,1
+access_bir_form_user,bir.form.user,model_bir_form,base.group_user,1,0,0,0
+access_bir_form_accountant,bir.form.accountant,model_bir_form,account.group_account_user,1,1,1,0
+access_bir_form_manager,bir.form.manager,model_bir_form,account.group_account_manager,1,1,1,1
+access_bir_filing_user,bir.filing.user,model_bir_filing,base.group_user,1,0,0,0
+access_bir_filing_accountant,bir.filing.accountant,model_bir_filing,account.group_account_user,1,1,1,0
+access_bir_filing_manager,bir.filing.manager,model_bir_filing,account.group_account_manager,1,1,1,1
+access_bir_sss_contribution_user,bir.sss.contribution.user,model_bir_sss_contribution,base.group_user,1,0,0,0
+access_bir_sss_contribution_manager,bir.sss.contribution.manager,model_bir_sss_contribution,account.group_account_manager,1,1,1,1
+access_hr_employee_dependent_user,hr.employee.dependent.user,model_hr_employee_dependent,base.group_user,1,0,0,0
+access_hr_employee_dependent_manager,hr.employee.dependent.manager,model_hr_employee_dependent,hr.group_hr_manager,1,1,1,1
+access_bir_filing_wizard,bir.filing.wizard,model_bir_filing_wizard,account.group_account_user,1,1,1,1
