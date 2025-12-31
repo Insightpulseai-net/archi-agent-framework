@@ -250,8 +250,19 @@ automation:
       - microsoft-ecosystem-integrations
 
   messaging:
-    name: mattermost
-    replaces: slack
+    primary:
+      name: mattermost
+      description: Self-hosted messaging for internal engineering
+      self_hosted: true
+    secondary:
+      name: slack
+      description: External collaboration and marketplace integrations
+      apps:
+        - claude
+        - chatgpt
+        - github
+        - google-drive
+      registry: spec/SLACK_APPS_REGISTRY.json
 
 # =============================================================================
 # Analytics / BI
