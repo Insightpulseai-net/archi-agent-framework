@@ -1,113 +1,52 @@
-# Environment files (never commit secrets)
+# Bridge Kit - Secrets and Build Artifacts
+
+# Environment files with credentials
 .env
-.env.*
-!.env.*.example
+.env.local
+.env.*.local
+.env.backup.*
 
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
+# Private keys
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Build artifacts
 build/
-develop-eggs/
 dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-.venv/
-venv/
-ENV/
+*.log
+*.pid
 
-# Node.js
+# Chrome extension (built version)
+build/extension/
+
+# Node modules (if added later)
 node_modules/
-.npm
-.next/
-out/
-.nuxt/
-dist/
 
-# IDE
-.idea/
+# Python (if added later)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+
+# macOS
+.DS_Store
+._*
+
+# Editor files
 .vscode/
+.idea/
 *.swp
 *.swo
 *~
-.project
-.classpath
-.settings/
 
-# OS
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# Logs
-*.log
-logs/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Testing
-.coverage
-htmlcov/
-.pytest_cache/
-.tox/
-coverage.xml
-*.cover
-
-# Docker
-.docker/
-
-# Backups (local)
-backups/
+# Backup files
 *.bak
 *.backup
 
-# Certificates (sensitive)
-*.pem
-*.key
-*.crt
-*.p12
-ssl/
-
-# Database
-*.db
-*.sqlite
-*.sqlite3
-
-# Jupyter
-.ipynb_checkpoints/
-*.ipynb_checkpoints
-
-# Terraform
-.terraform/
-*.tfstate
-*.tfstate.*
-*.tfvars
-
-# Secrets
-secrets/
-credentials/
-*.secret
-
-# Supabase (never commit keys/tokens)
-supabase/.env
-.supabase/
-**/supabase-key*
-**/supabase_config.json
-**/supabase_secrets.json
+# Keep template but not actual .env
+!.env.template

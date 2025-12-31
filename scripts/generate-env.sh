@@ -1,0 +1,74 @@
+#!/bin/bash
+# Bridge Kit - Environment Setup Generator
+# Creates .env.template and .env with all required placeholders
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+ENV_TEMPLATE="$PROJECT_ROOT/.env.template"
+ENV_FILE="$PROJECT_ROOT/.env"
+
+echo "🔧 Bridge Kit Environment Generator"
+echo "===================================="
+
+# Create .env.template
+cat > "$ENV_TEMPLATE" << 'EOF'
+# Bridge Kit Configuration
+# Generated: $(date)
+# Fill in YOUR values below, then run: ./scripts/setup-credentials.sh
+
+# ===== GITHUB APP CREDENTIALS =====
+GITHUB_APP_ID=YOUR_APP_ID_HERE
+GITHUB_APP_INSTALLATION_ID=YOUR_INSTALLATION_ID_HERE
+GITHUB_APP_PRIVATE_KEY_PATH=/path/to/private-key.pem
+GITHUB_APP_CLIENT_ID=YOUR_CLIENT_ID_HERE
+GITHUB_APP_CLIENT_SECRET=YOUR_CLIENT_SECRET_HERE
+
+# ===== n8n CONFIGURATION =====
+N8N_BASE_URL=https://n8n.insightpulseai.net
+N8N_WEBHOOK_URL=https://n8n.insightpulseai.net/webhook/bridge-kit
+N8N_API_KEY=YOUR_N8N_API_KEY_HERE
+N8N_MCP_SERVER_URL=https://n8n.insightpulseai.net/mcp-server/http
+
+# ===== CHROME EXTENSION =====
+CHROME_EXTENSION_ID=YOUR_EXTENSION_ID_HERE
+CHROME_POPUP_WEBHOOK=https://n8n.insightpulseai.net/webhook/chrome-context
+
+# ===== GITHUB REPOSITORIES =====
+GITHUB_ORG=insightpulseai
+PRIMARY_REPO=pulser-agent-framework
+ISSUES_REPO=insightpulse-tracker
+
+# ===== MCP SERVER CREDENTIALS =====
+MCP_SERVER_PORT=5000
+MCP_SERVER_HOST=localhost
+MCP_API_TOKEN=YOUR_MCP_TOKEN_HERE
+
+# ===== ENVIRONMENT =====
+ENVIRONMENT=development
+DEBUG=false
+LOG_LEVEL=info
+
+# ===== OPTIONAL: ENCRYPTION =====
+ENABLE_SECRETS_ENCRYPTION=false
+ENCRYPTION_KEY=YOUR_ENCRYPTION_KEY_HERE
+EOF
+
+echo "✅ Created: $ENV_TEMPLATE"
+
+# Copy template to .env if .env doesn't exist
+if [ ! -f "$ENV_FILE" ]; then
+    cp "$ENV_TEMPLATE" "$ENV_FILE"
+    echo "✅ Created: $ENV_FILE (copy of template)"
+    echo ""
+    echo "📝 Next step: ./scripts/setup-credentials.sh"
+else
+    echo "⚠️  $ENV_FILE already exists. Backup current version:"
+    cp "$ENV_FILE" "$ENV_FILE.backup.$(date +%s)"
+    echo "✅ Backed up to: $ENV_FILE.backup.*"
+fi
+
+echo ""
+echo "🚀 Ready to configure. Run:"
+echo "   ./scripts/setup-credentials.sh"
