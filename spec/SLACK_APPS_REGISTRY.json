@@ -1,0 +1,240 @@
+{
+    "catalog_version": "1.0.0",
+    "organization": "insightpulseai-net",
+    "description": "Slack Marketplace apps registry for Pulser Agent Framework integration with team communication and AI workflows",
+    "workspace": {
+        "name": "InsightPulseAI",
+        "plan": "Business+",
+        "admin_url": "https://app.slack.com/manage"
+    },
+    "apps": [
+        {
+            "app_name": "Claude",
+            "app_id": "A04KGS7N9A8",
+            "type": "AI Assistant",
+            "status": "installed",
+            "vendor": "Anthropic",
+            "purpose": "AI-powered code review, documentation generation, and conversational assistance",
+            "permissions": {
+                "channels": ["read", "write"],
+                "messages": ["read", "write"],
+                "users": ["read"],
+                "files": ["read"]
+            },
+            "features": {
+                "slash_commands": ["/claude"],
+                "mentions": true,
+                "direct_messages": true,
+                "thread_replies": true
+            },
+            "integrations": {
+                "n8n_webhook": "https://n8n.insightpulseai.net/webhook/slack-claude",
+                "use_cases": [
+                    "Code review assistance via @Claude mentions",
+                    "Documentation drafting in #docs channel",
+                    "Incident response analysis in #ops-alerts",
+                    "Compliance question answering"
+                ]
+            },
+            "marketplace": {
+                "url": "https://slack.com/apps/A04KGS7N9A8-claude",
+                "category": "Productivity",
+                "keywords": ["ai", "assistant", "code-review", "documentation"]
+            }
+        },
+        {
+            "app_name": "ChatGPT",
+            "app_id": "A04SK41B0HM",
+            "type": "AI Assistant",
+            "status": "installed",
+            "vendor": "OpenAI",
+            "purpose": "General-purpose AI assistant for brainstorming, drafting, and research",
+            "permissions": {
+                "channels": ["read", "write"],
+                "messages": ["read", "write"],
+                "users": ["read"]
+            },
+            "features": {
+                "slash_commands": ["/chatgpt"],
+                "mentions": true,
+                "direct_messages": true,
+                "thread_replies": true
+            },
+            "integrations": {
+                "n8n_webhook": "https://n8n.insightpulseai.net/webhook/slack-chatgpt",
+                "use_cases": [
+                    "Quick research and fact-checking",
+                    "Meeting summary generation",
+                    "Email and message drafting",
+                    "Translation and localization"
+                ]
+            },
+            "marketplace": {
+                "url": "https://slack.com/apps/A04SK41B0HM-chatgpt",
+                "category": "Productivity",
+                "keywords": ["ai", "assistant", "research", "drafting"]
+            }
+        },
+        {
+            "app_name": "GitHub",
+            "app_id": "A8GBNUWU8",
+            "type": "Developer Tool",
+            "status": "installed",
+            "vendor": "GitHub, Inc.",
+            "purpose": "GitHub notifications, PR reviews, and repository activity in Slack",
+            "permissions": {
+                "channels": ["read", "write"],
+                "messages": ["write"],
+                "workflows": ["trigger"]
+            },
+            "features": {
+                "slash_commands": ["/github"],
+                "subscriptions": true,
+                "unfurls": true,
+                "actions": true
+            },
+            "integrations": {
+                "n8n_webhook": "https://n8n.insightpulseai.net/webhook/slack-github",
+                "github_apps_bridge": [
+                    "pulser-docs-ingester",
+                    "pulser-compliance-gate",
+                    "pulser-codegen-executor",
+                    "pulser-release-mgr"
+                ],
+                "use_cases": [
+                    "PR notifications to #dev-prs channel",
+                    "Issue assignment alerts",
+                    "Deployment status updates in #ops-deploys",
+                    "Code review requests via DM"
+                ]
+            },
+            "subscriptions": {
+                "channels": {
+                    "#dev-prs": ["pulls", "reviews", "comments"],
+                    "#ops-deploys": ["deployments", "releases"],
+                    "#dev-issues": ["issues", "issue_comments"]
+                }
+            },
+            "marketplace": {
+                "url": "https://slack.com/apps/A8GBNUWU8-github",
+                "category": "Developer Tools",
+                "keywords": ["github", "pull-requests", "code-review", "devops"]
+            }
+        },
+        {
+            "app_name": "Google Drive",
+            "app_id": "A6NL8MJ6Q",
+            "type": "Productivity",
+            "status": "installed",
+            "vendor": "Google",
+            "purpose": "Share and preview Google Drive files directly in Slack",
+            "permissions": {
+                "channels": ["read", "write"],
+                "messages": ["write"],
+                "files": ["read", "write"]
+            },
+            "features": {
+                "slash_commands": ["/drive"],
+                "file_unfurls": true,
+                "file_sharing": true,
+                "access_requests": true
+            },
+            "integrations": {
+                "n8n_webhook": "https://n8n.insightpulseai.net/webhook/slack-gdrive",
+                "docs2code_pipeline": {
+                    "source": "google-docs",
+                    "target": "docs_raw",
+                    "enabled": true
+                },
+                "use_cases": [
+                    "Share specification documents from Drive",
+                    "Auto-unfurl Google Sheets in #data-engineering",
+                    "Docs2Code ingestion trigger from shared docs",
+                    "Meeting notes distribution"
+                ]
+            },
+            "marketplace": {
+                "url": "https://slack.com/apps/A6NL8MJ6Q-google-drive",
+                "category": "Productivity",
+                "keywords": ["google", "drive", "files", "collaboration"]
+            }
+        }
+    ],
+    "custom_integrations": {
+        "description": "Custom Slack integrations for Pulser Agent Framework",
+        "planned": [
+            {
+                "name": "pulser-slack-bot",
+                "type": "Custom Slack App",
+                "status": "backlog",
+                "purpose": "Native Pulser Agent Framework bot for Slack",
+                "features": [
+                    "Multi-agent orchestration via mentions",
+                    "Docs2Code triggers from Slack",
+                    "Compliance alerts to designated channels",
+                    "Executive dashboard summaries"
+                ]
+            },
+            {
+                "name": "pulser-workflow-steps",
+                "type": "Workflow Steps",
+                "status": "backlog",
+                "purpose": "Custom workflow steps for Slack Workflow Builder",
+                "steps": [
+                    "Trigger n8n workflow",
+                    "Query Supabase data",
+                    "Generate AI summary",
+                    "Create GitHub issue"
+                ]
+            }
+        ]
+    },
+    "channel_mappings": {
+        "description": "Recommended channel-to-app routing",
+        "mappings": [
+            {"channel": "#dev-prs", "apps": ["GitHub"], "purpose": "Pull request notifications"},
+            {"channel": "#dev-issues", "apps": ["GitHub"], "purpose": "Issue tracking"},
+            {"channel": "#ops-deploys", "apps": ["GitHub"], "purpose": "Deployment notifications"},
+            {"channel": "#ops-alerts", "apps": ["Claude", "ChatGPT"], "purpose": "Incident analysis"},
+            {"channel": "#data-engineering", "apps": ["Google Drive", "Claude"], "purpose": "Data specs and docs"},
+            {"channel": "#general", "apps": ["Claude", "ChatGPT"], "purpose": "General assistance"},
+            {"channel": "#docs", "apps": ["Claude", "Google Drive"], "purpose": "Documentation workflows"}
+        ]
+    },
+    "n8n_integration": {
+        "description": "n8n workflow automation with Slack apps",
+        "webhook_base": "https://n8n.insightpulseai.net/webhook",
+        "workflows": [
+            {
+                "name": "slack-to-github-issue",
+                "trigger": "Slack message reaction :github:",
+                "action": "Create GitHub issue from message"
+            },
+            {
+                "name": "github-pr-to-slack",
+                "trigger": "GitHub PR opened",
+                "action": "Post to #dev-prs with AI summary"
+            },
+            {
+                "name": "gdrive-doc-ingest",
+                "trigger": "Google Doc shared in Slack",
+                "action": "Trigger Docs2Code DocumentationParser"
+            },
+            {
+                "name": "ai-incident-analysis",
+                "trigger": "Alert posted to #ops-alerts",
+                "action": "Claude analyzes and suggests remediation"
+            }
+        ]
+    },
+    "next_steps": [
+        "1. Configure OAuth scopes for each installed app in Slack Admin",
+        "2. Set up n8n webhook endpoints for Slack event subscriptions",
+        "3. Create channel subscriptions for GitHub notifications",
+        "4. Enable Google Drive unfurling in relevant channels",
+        "5. Configure Claude/ChatGPT bot permissions per channel",
+        "6. Develop custom pulser-slack-bot for unified agent access",
+        "7. Create Workflow Steps for Slack Workflow Builder integration",
+        "8. Document migration path to Mattermost for self-hosted option"
+    ]
+}
