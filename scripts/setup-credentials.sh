@@ -110,6 +110,28 @@ read_input "GitHub Organization" "GITHUB_ORG" "insightpulseai"
 read_input "Primary Repository" "PRIMARY_REPO" "pulser-agent-framework"
 read_input "Issues Repository" "ISSUES_REPO" "insightpulse-tracker"
 
+# ===== SUPABASE =====
+echo ""
+echo "📌 SUPABASE CONFIGURATION"
+echo "------------------------"
+echo "Project: spdtwktxdalcfigzeqrz (external managed service)"
+echo "Get credentials from: https://supabase.com/dashboard/project/spdtwktxdalcfigzeqrz/settings/api"
+echo ""
+
+read_secret "Supabase Anon Key (hidden)" "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+read_secret "Supabase Service Role Key (hidden)" "SUPABASE_SERVICE_ROLE_KEY"
+read_secret "PostgreSQL Password (hidden)" "POSTGRES_PASSWORD"
+
+# ===== GOOGLE CLOUD =====
+echo ""
+echo "📌 GOOGLE CLOUD CREDENTIALS"
+echo "-------------------------"
+echo "Service Account: ipai-docs2code-runner@PROJECT_ID.iam.gserviceaccount.com"
+echo "Setup guide: docs/GOOGLE_CREDENTIALS_SETUP.md"
+echo ""
+
+read_input "Path to service account JSON" "GOOGLE_SERVICE_ACCOUNT_FILE" "secrets/ipai-docs2code-runner.json"
+
 # ===== ENVIRONMENT =====
 echo ""
 echo "📌 ENVIRONMENT SETTINGS"

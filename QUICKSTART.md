@@ -30,7 +30,11 @@
 - **Interactive** credential setup (prompts for each value)
 - Securely reads secrets (passwords hidden)
 - Updates `.env` with your values
-- **You need**: GitHub App credentials, n8n API key
+- **You need**:
+  - GitHub App credentials
+  - n8n API key
+  - Supabase credentials (anon key, service role key, PostgreSQL password)
+  - Google Cloud service account JSON (optional, for Docs sync)
 
 ### 3. `validate.sh`
 - Tests all credentials are set correctly
