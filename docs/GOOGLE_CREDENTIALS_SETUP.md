@@ -47,13 +47,16 @@ Your stack requires **2 credential types**:
 # Set project
 gcloud config set project insightpulseai
 
+# Set variables
+PROJECT_ID="$(gcloud config get-value project)"
+SA_NAME="ipai-docs2code-runner"
+SA_EMAIL="$SA_NAME@$PROJECT_ID.iam.gserviceaccount.com"
+
 # Create service account
-gcloud iam service-accounts create docs2code-svc \
-  --display-name="Docs2Code Pipeline Service Account" \
+gcloud iam service-accounts create "$SA_NAME" \
+  --display-name="IPAI Docs2Code Runner" \
   --description="Headless automation for Docs→GitHub sync, OCR, scheduled ingestion"
 
-# Get service account email
-SA_EMAIL="docs2code-svc@$(gcloud config get-value project).iam.gserviceaccount.com"
 echo "Service Account Email: $SA_EMAIL"
 ```
 
@@ -63,24 +66,38 @@ echo "Service Account Email: $SA_EMAIL"
 # Create secrets directory (gitignored)
 mkdir -p secrets
 
-# Generate JSON key
-gcloud iam service-accounts keys create secrets/docs2code-svc.json \
+# Generate JSON key (only needed if running outside GCP)
+gcloud iam service-accounts keys create "secrets/$SA_NAME.json" \
   --iam-account="$SA_EMAIL"
 
-echo "✅ Key file created: secrets/docs2code-svc.json"
+echo "✅ Key file created: secrets/$SA_NAME.json"
 echo "⚠️  NEVER commit this file to git!"
+echo "ℹ️  If running on Cloud Run/GCE, skip this - use ADC instead"
 ```
 
 ### Grant Required Roles
 
 ```bash
-# Project-level roles (adjust as needed)
-gcloud projects add-iam-policy-binding insightpulseai \
-  --member="serviceAccount:$SA_EMAIL" \
-  --role="roles/cloudfunctions.invoker"
+# Minimal required roles
+PROJECT_ID="$(gcloud config get-value project)"
 
-# For Vision API (OCR)
-gcloud projects add-iam-policy-binding insightpulseai \
+# Secret Manager (for accessing stored credentials)
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:$SA_EMAIL" \
+  --role="roles/secretmanager.secretAccessor"
+
+# Cloud Storage (if storing assets/files)
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:$SA_EMAIL" \
+  --role="roles/storage.objectAdmin"
+
+# AI Platform (for Vertex AI, if used)
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:$SA_EMAIL" \
+  --role="roles/aiplatform.user"
+
+# Vision API (for OCR)
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --member="serviceAccount:$SA_EMAIL" \
   --role="roles/cloudvision.user"
 ```
@@ -89,11 +106,11 @@ gcloud projects add-iam-policy-binding insightpulseai \
 
 **Service accounts don't automatically see Drive files.** You must share:
 
-**Option A: Share specific folders/files**
+**Option A: Share specific folders/files** (Recommended)
 ```
 1. Open Google Drive
 2. Right-click folder → Share
-3. Add: docs2code-svc@insightpulseai.iam.gserviceaccount.com
+3. Add: ipai-docs2code-runner@insightpulseai.iam.gserviceaccount.com
 4. Set permissions: "Viewer" or "Editor"
 ```
 
@@ -121,23 +138,30 @@ SCOPES = [
 from google.oauth2 import service_account
 
 credentials = service_account.Credentials.from_service_account_file(
-    'secrets/docs2code-svc.json',
+    'secrets/ipai-docs2code-runner.json',  # Only for outside GCP
     scopes=SCOPES
 )
+
+# Or use Application Default Credentials (if on GCP):
+# from google.auth import default
+# credentials, project = default(scopes=SCOPES)
 ```
 
 ### Store in GitHub Secrets
 
 ```bash
 # Copy JSON content
-cat secrets/docs2code-svc.json | pbcopy  # macOS
-# Or: cat secrets/docs2code-svc.json | xclip -selection clipboard  # Linux
+cat secrets/ipai-docs2code-runner.json | pbcopy  # macOS
+# Or: cat secrets/ipai-docs2code-runner.json | xclip -selection clipboard  # Linux
 
 # Add to GitHub:
 # 1. Go to: https://github.com/Insightpulseai-net/pulser-agent-framework/settings/secrets/actions
 # 2. Click "New repository secret"
 # 3. Name: GOOGLE_CREDENTIALS
 # 4. Value: <paste JSON>
+
+# Note: If running on DigitalOcean/external infra, you need the JSON key
+# If running on GCP (Cloud Run, GCE), use Application Default Credentials instead
 ```
 
 ---

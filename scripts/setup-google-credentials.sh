@@ -39,7 +39,7 @@ echo -e "${GREEN}✅ Using project: $PROJECT_ID${NC}"
 echo ""
 
 # Service account email
-SA_NAME="docs2code-svc"
+SA_NAME="ipai-docs2code-runner"
 SA_EMAIL="$SA_NAME@$PROJECT_ID.iam.gserviceaccount.com"
 
 # Menu
@@ -66,16 +66,42 @@ case "$CHOICE" in
             echo -e "${YELLOW}⚠️  Service account already exists: $SA_EMAIL${NC}"
         else
             gcloud iam service-accounts create "$SA_NAME" \
-                --display-name="Docs2Code Pipeline Service Account" \
+                --display-name="IPAI Docs2Code Runner" \
                 --description="Headless automation for Docs→GitHub sync, OCR, scheduled ingestion"
 
             echo -e "${GREEN}✅ Service account created: $SA_EMAIL${NC}"
+
+            # Grant minimal required roles
+            echo -e "${BLUE}   Granting roles...${NC}"
+
+            gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+                --member="serviceAccount:$SA_EMAIL" \
+                --role="roles/secretmanager.secretAccessor" \
+                --condition=None
+
+            gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+                --member="serviceAccount:$SA_EMAIL" \
+                --role="roles/storage.objectAdmin" \
+                --condition=None
+
+            gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+                --member="serviceAccount:$SA_EMAIL" \
+                --role="roles/aiplatform.user" \
+                --condition=None
+
+            # Vision API (OCR)
+            gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+                --member="serviceAccount:$SA_EMAIL" \
+                --role="roles/cloudvision.user" \
+                --condition=None || true
+
+            echo -e "${GREEN}   ✅ Roles granted${NC}"
         fi
 
         # Create key file
         mkdir -p "$SECRETS_DIR"
 
-        KEY_FILE="$SECRETS_DIR/docs2code-svc.json"
+        KEY_FILE="$SECRETS_DIR/$SA_NAME.json"
         if [ -f "$KEY_FILE" ]; then
             echo -e "${YELLOW}⚠️  Key file already exists: $KEY_FILE${NC}"
             echo -n "Overwrite? (y/N): "
