@@ -1,0 +1,88 @@
+{
+    "catalog_version": "1.0.0",
+    "organization": "insightpulseai-net",
+    "description": "GitHub Apps registry for Docs2Code pipeline (DocumentationParser, ComplianceValidator, CodeGenerator, SQLAgent, ValidationAgent, DeploymentOrchestrator)",
+    "apps": [
+          {
+                  "app_name": "pulser-docs-ingester",
+                  "type": "GitHub App",
+                  "status": "in_development",
+                  "purpose": "Extract and index documentation (SAP, Microsoft, Odoo, OCA, BIR, Databricks)",
+                  "webhook_events": ["push", "pull_request_target"],
+                  "permissions": {
+                            "contents": "read",
+                            "metadata": "read"
+                  },
+                  "marketplace": {
+                            "category": "Developer tools",
+                            "keywords": ["documentation", "knowledge-base", "semantic-search", "odoo"]
+                  }
+          },
+          {
+                  "app_name": "pulser-compliance-gate",
+                  "type": "GitHub App (Check Runs)",
+                  "status": "in_development",
+                  "purpose": "Gate PRs on regulatory compliance (BIR, PFRS, DOLE)",
+                  "webhook_events": ["pull_request", "push"],
+                  "permissions": {
+                            "checks": "write",
+                            "contents": "read",
+                            "statuses": "write"
+                  },
+                  "marketplace": {
+                            "category": "Security and compliance",
+                            "keywords": ["compliance", "regulatory", "bir", "pfrs", "dole"]
+                  }
+          },
+          {
+                  "app_name": "pulser-codegen-executor",
+                  "type": "GitHub App (Issue-driven)",
+                  "status": "in_development",
+                  "purpose": "Generate production-ready code from GitHub issues",
+                  "webhook_events": ["issues", "issue_comment"],
+                  "permissions": {
+                            "contents": "write",
+                            "pull_requests": "write",
+                            "issues": "read"
+                  },
+                  "marketplace": {
+                            "category": "Developer tools",
+                            "keywords": ["code-generation", "odoo", "module-scaffold", "tdd"]
+                  }
+          },
+          {
+                  "app_name": "action-pytest-coverage",
+                  "type": "GitHub Action",
+                  "status": "in_development",
+                  "purpose": "Enforce TDD gates (≥90% unit, ≥80% integration coverage)",
+                  "marketplace": {
+                            "category": "Testing",
+                            "keywords": ["testing", "coverage", "pytest", "validation"]
+                  }
+          },
+          {
+                  "app_name": "pulser-release-mgr",
+                  "type": "GitHub App (Deployment)",
+                  "status": "in_development",
+                  "purpose": "Blue/green deployment with auto-rollback on DigitalOcean",
+                  "webhook_events": ["release", "deployment"],
+                  "permissions": {
+                            "deployments": "write",
+                            "deployment_statuses": "write",
+                            "contents": "read"
+                  },
+                  "marketplace": {
+                            "category": "DevOps and deployment",
+                            "keywords": ["deployment", "blue-green", "rollback", "digitalocean"]
+                  }
+          }
+    ],
+    "next_steps": [
+          "1. Register each app at https://github.com/settings/apps/new",
+          "2. Set webhook URLs to n8n: https://n8n.insightpulseai.net/webhook/github-{app_name}",
+          "3. Install on insightpulseai-staging org for testing",
+          "4. Test all webhook events",
+          "5. Submit to GitHub Marketplace for review",
+          "6. Launch with blog post + demo video"
+    ]
+}
