@@ -1,0 +1,639 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Pulser-Hub API",
+    "description": "ChatGPT-compatible AI Agent for Docs2Code Pipeline Control. Enables natural language control of the entire documentation-to-code pipeline including SAP ingestion, gap analysis, Odoo code generation, BIR compliance verification, and automated deployment.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "InsightPulseAI",
+      "url": "https://insightpulseai.net"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://pulser-hub.azurewebsites.net",
+      "description": "Production API"
+    },
+    {
+      "url": "http://localhost:8000",
+      "description": "Local development"
+    }
+  ],
+  "paths": {
+    "/chatgpt/function-call": {
+      "post": {
+        "operationId": "handleChatGPTFunction",
+        "summary": "Execute a Pulser-Hub function",
+        "description": "Main entry point for ChatGPT Actions. Handles all pipeline operations including running notebooks, checking compliance, committing code, and deploying modules.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatGPTFunctionCall"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful execution",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatGPTResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pipeline/run": {
+      "post": {
+        "operationId": "runPipeline",
+        "summary": "Execute Docs2Code pipeline",
+        "description": "Execute the Docs2Code pipeline in Databricks. Available actions: run_full_pipeline (90 min), run_ingestion (30 min), run_analysis (15 min), run_generation (20 min), run_compliance (10 min), run_deployment (15 min).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PipelineRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Pipeline started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PipelineResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pipeline/status/{run_id}": {
+      "get": {
+        "operationId": "getPipelineStatus",
+        "summary": "Get pipeline execution status",
+        "description": "Check the status and progress of a running pipeline.",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The run ID returned from runPipeline"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pipeline status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PipelineStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/compliance/status/{form_number}": {
+      "get": {
+        "operationId": "getComplianceStatus",
+        "summary": "Get BIR form compliance status",
+        "description": "Check compliance status for a specific BIR form. Supported forms: 1700 (Annual Income Tax), 1601-C (Monthly Withholding), 2550-Q (Quarterly VAT), and 33 more.",
+        "parameters": [
+          {
+            "name": "form_number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "examples": ["1700", "1601-C", "2550-Q"]
+            },
+            "description": "BIR form number"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Compliance status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComplianceStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/compliance/summary": {
+      "get": {
+        "operationId": "getComplianceSummary",
+        "summary": "Get overall compliance summary",
+        "description": "Get compliance summary for all 36 BIR forms.",
+        "responses": {
+          "200": {
+            "description": "Compliance summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComplianceSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/github/commit": {
+      "post": {
+        "operationId": "commitToGitHub",
+        "summary": "Commit code to GitHub",
+        "description": "Commit generated code to the GitHub repository and optionally create a pull request.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitHubCommitRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Commit successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubCommitResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/github/status": {
+      "get": {
+        "operationId": "getGitHubStatus",
+        "summary": "Get GitHub App status",
+        "description": "Get the status of the GitHub App installation and permissions.",
+        "responses": {
+          "200": {
+            "description": "GitHub status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitHubStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/odoo/deploy": {
+      "post": {
+        "operationId": "deployToOdoo",
+        "summary": "Deploy module to Odoo",
+        "description": "Deploy a generated module to an Odoo instance (staging or production).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeploymentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Deployment started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeploymentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/odoo/status/{deployment_id}": {
+      "get": {
+        "operationId": "getDeploymentStatus",
+        "summary": "Get deployment status",
+        "description": "Check the status of an Odoo deployment.",
+        "parameters": [
+          {
+            "name": "deployment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The deployment ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deployment status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeploymentStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "healthCheck",
+        "summary": "Health check",
+        "description": "Check the health of the Pulser-Hub service.",
+        "responses": {
+          "200": {
+            "description": "Service healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthCheck"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ChatGPTFunctionCall": {
+        "type": "object",
+        "required": ["function", "arguments"],
+        "properties": {
+          "function": {
+            "type": "string",
+            "enum": ["run_pipeline", "query_compliance", "commit_code", "deploy_module", "get_status"],
+            "description": "The function to execute"
+          },
+          "arguments": {
+            "type": "object",
+            "description": "Function-specific arguments"
+          }
+        }
+      },
+      "ChatGPTResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["success", "error"]
+          },
+          "data": {
+            "type": "object"
+          },
+          "message": {
+            "type": "string"
+          },
+          "next_steps": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "PipelineRequest": {
+        "type": "object",
+        "required": ["action"],
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": ["run_full_pipeline", "run_ingestion", "run_analysis", "run_generation", "run_compliance", "run_deployment"],
+            "description": "Pipeline action to execute"
+          },
+          "parameters": {
+            "type": "object",
+            "description": "Optional parameters for the pipeline"
+          },
+          "notify_on_complete": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      },
+      "PipelineResponse": {
+        "type": "object",
+        "properties": {
+          "run_id": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "estimated_completion": {
+            "type": "string"
+          },
+          "progress": {
+            "type": "object"
+          }
+        }
+      },
+      "PipelineStatus": {
+        "type": "object",
+        "properties": {
+          "run_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["PENDING", "RUNNING", "COMPLETED", "FAILED", "CANCELLED"]
+          },
+          "progress": {
+            "type": "object",
+            "properties": {
+              "current_notebook": {
+                "type": "string"
+              },
+              "completed": {
+                "type": "integer"
+              },
+              "total": {
+                "type": "integer"
+              },
+              "percentage": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      },
+      "ComplianceStatus": {
+        "type": "object",
+        "properties": {
+          "form_number": {
+            "type": "string"
+          },
+          "form_name": {
+            "type": "string"
+          },
+          "fields_covered": {
+            "type": "integer"
+          },
+          "fields_total": {
+            "type": "integer"
+          },
+          "tax_rates_current": {
+            "type": "boolean"
+          },
+          "audit_trails_enabled": {
+            "type": "boolean"
+          },
+          "efiling_ready": {
+            "type": "boolean"
+          },
+          "compliance_percentage": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["COMPLIANT", "NON_COMPLIANT", "PARTIAL"]
+          }
+        }
+      },
+      "ComplianceSummary": {
+        "type": "object",
+        "properties": {
+          "total_forms": {
+            "type": "integer"
+          },
+          "compliant": {
+            "type": "integer"
+          },
+          "non_compliant": {
+            "type": "integer"
+          },
+          "partial": {
+            "type": "integer"
+          },
+          "overall_percentage": {
+            "type": "number"
+          },
+          "last_verified": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "tax_year": {
+            "type": "integer"
+          },
+          "categories": {
+            "type": "object"
+          }
+        }
+      },
+      "GitHubCommitRequest": {
+        "type": "object",
+        "required": ["commit_message", "files"],
+        "properties": {
+          "branch": {
+            "type": "string",
+            "default": "claude/auto-generated-modules"
+          },
+          "commit_message": {
+            "type": "string"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "create_pr": {
+            "type": "boolean",
+            "default": true
+          },
+          "pr_title": {
+            "type": "string"
+          },
+          "pr_body": {
+            "type": "string"
+          }
+        }
+      },
+      "GitHubCommitResponse": {
+        "type": "object",
+        "properties": {
+          "commit_sha": {
+            "type": "string"
+          },
+          "branch": {
+            "type": "string"
+          },
+          "pr_url": {
+            "type": "string"
+          },
+          "files_changed": {
+            "type": "integer"
+          }
+        }
+      },
+      "GitHubStatus": {
+        "type": "object",
+        "properties": {
+          "app_id": {
+            "type": "string"
+          },
+          "client_id": {
+            "type": "string"
+          },
+          "installation_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "permissions": {
+            "type": "object"
+          },
+          "repository": {
+            "type": "string"
+          }
+        }
+      },
+      "DeploymentRequest": {
+        "type": "object",
+        "required": ["module_name"],
+        "properties": {
+          "module_name": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string",
+            "enum": ["staging", "production"],
+            "default": "staging"
+          },
+          "run_tests": {
+            "type": "boolean",
+            "default": true
+          },
+          "auto_upgrade": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      },
+      "DeploymentResponse": {
+        "type": "object",
+        "properties": {
+          "deployment_id": {
+            "type": "string"
+          },
+          "module_name": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "tests_passed": {
+            "type": "integer"
+          },
+          "tests_failed": {
+            "type": "integer"
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      },
+      "DeploymentStatus": {
+        "type": "object",
+        "properties": {
+          "deployment_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "module_name": {
+            "type": "string"
+          },
+          "tests_passed": {
+            "type": "integer"
+          },
+          "tests_failed": {
+            "type": "integer"
+          },
+          "coverage": {
+            "type": "number"
+          },
+          "deployed_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "HealthCheck": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "service": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "integrations": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  }
+}
