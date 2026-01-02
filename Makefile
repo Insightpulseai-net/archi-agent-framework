@@ -133,6 +133,9 @@ help: ## Show this help message
 	@echo "$(YELLOW)Deployment:$(RESET)"
 	@grep -E '^(go-live|rollback|deploy-).*:.*##' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*##"}; {printf "  $(GREEN)%-20s$(RESET) %s\n", $$1, $$2}'
 	@echo ""
+	@echo "$(YELLOW)GenAI Toolbox:$(RESET)"
+	@grep -E '^toolbox-.*:.*##' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*##"}; {printf "  $(GREEN)%-20s$(RESET) %s\n", $$1, $$2}'
+	@echo ""
 	@echo "$(YELLOW)Development:$(RESET)"
 	@grep -E '^(init|deps|lint|fmt|logs).*:.*##' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*##"}; {printf "  $(GREEN)%-20s$(RESET) %s\n", $$1, $$2}'
 	@echo ""
@@ -585,6 +588,69 @@ ml-smoke: ## Run smoke test on model release
 		--tag $(TAG) \
 		--model-path release/$(TAG)
 	@echo "$(GREEN)✅ Smoke test passed$(RESET)"
+
+# =============================================================================
+# GENAI TOOLBOX (DB TOOL PLANE)
+# =============================================================================
+
+COMPOSE_TOOLBOX := $(INFRA_DIR)/docker-compose.toolbox.yml
+TOOLBOX_URL := http://localhost:5000
+
+.PHONY: toolbox-up
+toolbox-up: ## Start GenAI Toolbox server
+	@echo "$(CYAN)🔧 Starting GenAI Toolbox...$(RESET)"
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_BASE) -f $(COMPOSE_TOOLBOX) up -d toolbox
+	@echo "$(GREEN)✅ Toolbox started at $(TOOLBOX_URL)$(RESET)"
+
+.PHONY: toolbox-down
+toolbox-down: ## Stop GenAI Toolbox server
+	@echo "$(YELLOW)⏹️ Stopping Toolbox...$(RESET)"
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_TOOLBOX) down
+	@echo "$(GREEN)✅ Toolbox stopped$(RESET)"
+
+.PHONY: toolbox-dev
+toolbox-dev: ## Start Toolbox in development mode (with debug logs)
+	@echo "$(CYAN)🔧 Starting Toolbox in dev mode...$(RESET)"
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_TOOLBOX) --profile dev up -d
+	@echo "$(GREEN)✅ Toolbox dev started$(RESET)"
+
+.PHONY: toolbox-logs
+toolbox-logs: ## Follow Toolbox logs
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_TOOLBOX) logs -f toolbox
+
+.PHONY: toolbox-health
+toolbox-health: ## Check Toolbox health
+	@echo "$(CYAN)🔍 Checking Toolbox health...$(RESET)"
+	@curl -sS $(TOOLBOX_URL)/health | jq . || echo "$(RED)Toolbox not responding$(RESET)"
+
+.PHONY: toolbox-tools
+toolbox-tools: ## List available Toolbox tools
+	@echo "$(CYAN)📋 Listing Toolbox tools...$(RESET)"
+	@curl -sS $(TOOLBOX_URL)/api/tools | jq '.tools | keys[]' || echo "$(RED)Failed to list tools$(RESET)"
+
+.PHONY: toolbox-toolsets
+toolbox-toolsets: ## List available Toolbox toolsets
+	@echo "$(CYAN)📋 Listing Toolbox toolsets...$(RESET)"
+	@curl -sS $(TOOLBOX_URL)/api/toolsets | jq . || echo "$(RED)Failed to list toolsets$(RESET)"
+
+.PHONY: toolbox-generate
+toolbox-generate: ## Generate tools from OpenAPI specs and DB schema
+	@echo "$(CYAN)⚙️ Generating Toolbox tools...$(RESET)"
+	@$(PYTHON) tools/toolbox/generate_tools.py --all --output tools/toolbox/generated_tools.yaml
+	@echo "$(GREEN)✅ Tools generated$(RESET)"
+
+.PHONY: toolbox-validate
+toolbox-validate: ## Validate tools.yaml configuration
+	@echo "$(CYAN)🔍 Validating tools.yaml...$(RESET)"
+	@$(PYTHON) -c "import yaml; yaml.safe_load(open('tools/toolbox/tools.yaml'))" && \
+		echo "$(GREEN)✅ tools.yaml is valid YAML$(RESET)" || \
+		echo "$(RED)❌ Invalid YAML$(RESET)"
+
+.PHONY: toolbox-client-build
+toolbox-client-build: ## Build TypeScript Toolbox client
+	@echo "$(CYAN)🔨 Building TypeScript client...$(RESET)"
+	@cd extensions/workbench-toolbox && npm install && npm run build
+	@echo "$(GREEN)✅ TypeScript client built$(RESET)"
 
 # =============================================================================
 # ARTIFACT INGESTION

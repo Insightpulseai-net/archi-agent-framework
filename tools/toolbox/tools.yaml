@@ -1,0 +1,374 @@
+# =============================================================================
+# Google GenAI Toolbox - Tools Configuration
+# InsightPulse AI Data Engineering Workbench
+# =============================================================================
+#
+# This file defines database tools exposed via MCP protocol using Google's
+# GenAI Toolbox (https://github.com/googleapis/genai-toolbox).
+#
+# Structure:
+#   sources  → Connection definitions (Postgres, etc.)
+#   tools    → Executable capabilities bound to a source
+#   toolsets → Named bundles of tools exposed to clients
+#
+# Architecture:
+#   - Toolbox = DB tool plane (handles pooling, auth, observability)
+#   - Workbench-API = Pipeline plane (artifacts, codegen, orchestration)
+#   - VS Code Extension / Agents = UX shell (calls both planes)
+#
+# Usage:
+#   docker compose -f docker-compose.toolbox.yml up
+#   curl http://localhost:5000/health
+#
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Data Sources
+# -----------------------------------------------------------------------------
+sources:
+  workbench_pg:
+    kind: postgres
+    host: ${WORKBENCH_PG_HOST}
+    port: ${WORKBENCH_PG_PORT}
+    database: ${WORKBENCH_PG_DB}
+    user: ${WORKBENCH_PG_USER}
+    password: ${WORKBENCH_PG_PASSWORD}
+
+# -----------------------------------------------------------------------------
+# Tools
+# -----------------------------------------------------------------------------
+tools:
+  # ===========================================================================
+  # Core SQL Execution
+  # ===========================================================================
+
+  workbench_sql:
+    kind: postgres-sql
+    source: workbench_pg
+    description: |
+      Execute SQL queries against the Workbench database.
+      Supports Medallion architecture schemas: bronze, silver, gold, workbench.
+
+  # ===========================================================================
+  # Schema Introspection
+  # ===========================================================================
+
+  list_schemas:
+    kind: postgres-sql
+    source: workbench_pg
+    description: List all schemas in the Workbench database.
+    statement: |
+      SELECT schema_name,
+             pg_catalog.obj_description(oid, 'pg_namespace') as description
+      FROM information_schema.schemata s
+      JOIN pg_namespace n ON s.schema_name = n.nspname
+      WHERE schema_name NOT IN ('pg_catalog', 'information_schema', 'pg_toast')
+      ORDER BY schema_name
+
+  list_tables:
+    kind: postgres-sql
+    source: workbench_pg
+    description: List all tables in a given schema with row counts.
+    statement: |
+      SELECT
+        t.table_name,
+        pg_catalog.obj_description(c.oid, 'pg_class') as description,
+        (SELECT reltuples::bigint FROM pg_class WHERE relname = t.table_name) as approx_rows
+      FROM information_schema.tables t
+      JOIN pg_class c ON t.table_name = c.relname
+      WHERE t.table_schema = $1
+        AND t.table_type = 'BASE TABLE'
+      ORDER BY t.table_name
+    parameters:
+      - name: schema
+        type: string
+        description: Schema name (bronze, silver, gold, workbench, audit)
+
+  describe_table:
+    kind: postgres-sql
+    source: workbench_pg
+    description: Get detailed column information for a table.
+    statement: |
+      SELECT
+        c.column_name,
+        c.data_type,
+        c.is_nullable,
+        c.column_default,
+        pg_catalog.col_description(
+          (SELECT oid FROM pg_class WHERE relname = $2 AND relnamespace = (
+            SELECT oid FROM pg_namespace WHERE nspname = $1
+          )),
+          c.ordinal_position
+        ) as description
+      FROM information_schema.columns c
+      WHERE c.table_schema = $1
+        AND c.table_name = $2
+      ORDER BY c.ordinal_position
+    parameters:
+      - name: schema
+        type: string
+        description: Schema name
+      - name: table
+        type: string
+        description: Table name
+
+  list_indexes:
+    kind: postgres-sql
+    source: workbench_pg
+    description: List indexes for a given table.
+    statement: |
+      SELECT
+        i.relname as index_name,
+        am.amname as index_type,
+        pg_get_indexdef(i.oid) as index_definition,
+        idx.indisunique as is_unique,
+        idx.indisprimary as is_primary
+      FROM pg_index idx
+      JOIN pg_class i ON i.oid = idx.indexrelid
+      JOIN pg_class t ON t.oid = idx.indrelid
+      JOIN pg_namespace n ON n.oid = t.relnamespace
+      JOIN pg_am am ON am.oid = i.relam
+      WHERE n.nspname = $1
+        AND t.relname = $2
+    parameters:
+      - name: schema
+        type: string
+        description: Schema name
+      - name: table
+        type: string
+        description: Table name
+
+  # ===========================================================================
+  # Query Analysis
+  # ===========================================================================
+
+  explain_query:
+    kind: postgres-sql
+    source: workbench_pg
+    description: Get the execution plan for a SQL query (EXPLAIN).
+    statement: |
+      EXPLAIN (FORMAT JSON, COSTS, VERBOSE)
+      SELECT 1
+    parameters:
+      - name: query
+        type: string
+        description: SQL query to analyze (read-only)
+
+  table_stats:
+    kind: postgres-sql
+    source: workbench_pg
+    description: Get table statistics including size, row count, and bloat.
+    statement: |
+      SELECT
+        pg_size_pretty(pg_total_relation_size(format('%I.%I', $1, $2))) as total_size,
+        pg_size_pretty(pg_relation_size(format('%I.%I', $1, $2))) as table_size,
+        pg_size_pretty(pg_indexes_size(format('%I.%I', $1, $2)::regclass)) as indexes_size,
+        (SELECT reltuples::bigint FROM pg_class
+         WHERE relname = $2 AND relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = $1)) as approx_rows,
+        (SELECT n_live_tup FROM pg_stat_user_tables
+         WHERE schemaname = $1 AND relname = $2) as live_tuples,
+        (SELECT n_dead_tup FROM pg_stat_user_tables
+         WHERE schemaname = $1 AND relname = $2) as dead_tuples,
+        (SELECT last_vacuum FROM pg_stat_user_tables
+         WHERE schemaname = $1 AND relname = $2) as last_vacuum,
+        (SELECT last_analyze FROM pg_stat_user_tables
+         WHERE schemaname = $1 AND relname = $2) as last_analyze
+    parameters:
+      - name: schema
+        type: string
+        description: Schema name
+      - name: table
+        type: string
+        description: Table name
+
+  # ===========================================================================
+  # Medallion Layer Queries
+  # ===========================================================================
+
+  query_bronze:
+    kind: postgres-sql
+    source: workbench_pg
+    description: Query the Bronze layer (raw, immutable ingested data).
+    statement: |
+      SELECT * FROM bronze.raw_documents
+      WHERE created_at > NOW() - INTERVAL '7 days'
+      ORDER BY created_at DESC
+      LIMIT 100
+
+  query_silver:
+    kind: postgres-sql
+    source: workbench_pg
+    description: Query the Silver layer (cleaned, validated data).
+    statement: |
+      SELECT table_name, approx_rows
+      FROM (
+        SELECT t.table_name,
+               (SELECT reltuples::bigint FROM pg_class WHERE relname = t.table_name) as approx_rows
+        FROM information_schema.tables t
+        WHERE t.table_schema = 'silver'
+          AND t.table_type = 'BASE TABLE'
+      ) sub
+      ORDER BY approx_rows DESC
+
+  query_gold:
+    kind: postgres-sql
+    source: workbench_pg
+    description: Query the Gold layer (business-ready aggregates).
+    statement: |
+      SELECT table_name, approx_rows
+      FROM (
+        SELECT t.table_name,
+               (SELECT reltuples::bigint FROM pg_class WHERE relname = t.table_name) as approx_rows
+        FROM information_schema.tables t
+        WHERE t.table_schema = 'gold'
+          AND t.table_type = 'BASE TABLE'
+      ) sub
+      ORDER BY approx_rows DESC
+
+  # ===========================================================================
+  # Workbench Operations
+  # ===========================================================================
+
+  list_pipelines:
+    kind: postgres-sql
+    source: workbench_pg
+    description: List all data pipelines with their status.
+    statement: |
+      SELECT
+        id, name, description, status, schedule,
+        last_run_at, next_run_at,
+        (SELECT COUNT(*) FROM workbench.pipeline_runs WHERE pipeline_id = p.id) as total_runs,
+        created_at, updated_at
+      FROM workbench.pipelines p
+      ORDER BY updated_at DESC
+      LIMIT 50
+
+  list_connections:
+    kind: postgres-sql
+    source: workbench_pg
+    description: List configured data connections (credentials masked).
+    statement: |
+      SELECT
+        id, name, type,
+        config - 'password' - 'secret' - 'api_key' as config_safe,
+        is_active, last_tested_at, last_test_status,
+        created_at
+      FROM workbench.connections
+      ORDER BY name
+
+  list_notebooks:
+    kind: postgres-sql
+    source: workbench_pg
+    description: List Jupyter notebooks in the workbench.
+    statement: |
+      SELECT
+        id, name, description, path,
+        kernel, status, last_run_at,
+        created_by, created_at, updated_at
+      FROM workbench.notebooks
+      ORDER BY updated_at DESC
+      LIMIT 50
+
+  list_artifacts:
+    kind: postgres-sql
+    source: workbench_pg
+    description: List recent artifacts from the artifact registry.
+    statement: |
+      SELECT
+        id, artifact_type, name, version, status,
+        metadata, created_at
+      FROM workbench.artifacts
+      ORDER BY created_at DESC
+      LIMIT 100
+
+  # ===========================================================================
+  # Catalog Search
+  # ===========================================================================
+
+  search_catalog:
+    kind: postgres-sql
+    source: workbench_pg
+    description: Search the data catalog for tables or columns.
+    statement: |
+      WITH search_results AS (
+        SELECT
+          'table' as type,
+          table_schema as schema,
+          table_name as name,
+          NULL::text as column_name
+        FROM information_schema.tables
+        WHERE table_schema IN ('bronze', 'silver', 'gold', 'workbench')
+          AND table_name ILIKE '%' || $1 || '%'
+        UNION ALL
+        SELECT
+          'column' as type,
+          table_schema as schema,
+          table_name as name,
+          column_name
+        FROM information_schema.columns
+        WHERE table_schema IN ('bronze', 'silver', 'gold', 'workbench')
+          AND column_name ILIKE '%' || $1 || '%'
+      )
+      SELECT * FROM search_results
+      ORDER BY type, schema, name
+      LIMIT 100
+    parameters:
+      - name: query
+        type: string
+        description: Search term for table or column names
+
+# -----------------------------------------------------------------------------
+# Toolsets
+# -----------------------------------------------------------------------------
+# Clients load a named toolset, not individual tools.
+# Group tools by use case / permission level.
+# -----------------------------------------------------------------------------
+toolsets:
+  # Default toolset for general agent use
+  default:
+    - workbench_sql
+
+  # Read-only tools for data exploration
+  explorer:
+    - workbench_sql
+    - list_schemas
+    - list_tables
+    - describe_table
+    - query_bronze
+    - query_silver
+    - query_gold
+    - search_catalog
+
+  # Schema analysis and query optimization
+  analyst:
+    - workbench_sql
+    - list_schemas
+    - list_tables
+    - describe_table
+    - list_indexes
+    - explain_query
+    - table_stats
+
+  # Workbench platform operations
+  workbench:
+    - workbench_sql
+    - list_pipelines
+    - list_connections
+    - list_notebooks
+    - list_artifacts
+    - search_catalog
+
+  # Full access for admin operations
+  admin:
+    - workbench_sql
+    - list_schemas
+    - list_tables
+    - describe_table
+    - list_indexes
+    - explain_query
+    - table_stats
+    - list_pipelines
+    - list_connections
+    - list_notebooks
+    - list_artifacts
+    - search_catalog

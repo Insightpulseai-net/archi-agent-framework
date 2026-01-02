@@ -1,0 +1,134 @@
+version: '3.8'
+
+# ============================================================================
+# MCP Toolbox for Databases - Docker Compose Stack
+# ============================================================================
+# A standardized tool-serving control plane for database operations.
+# Exposes DB tools via MCP protocol with built-in pooling, auth, and OTel.
+#
+# Usage:
+#   docker compose -f docker-compose.base.yml -f docker-compose.toolbox.yml up
+#   docker compose -f docker-compose.toolbox.yml -f docker-compose.workbench.yml up
+#
+# Architecture:
+#   - Toolbox = DB tool plane (query, explain, migrate, index, profile)
+#   - Workbench-API = Pipeline plane (artifacts, codegen, orchestration)
+#   - VS Code Extension / Agents = UX shell (calls both planes)
+# ============================================================================
+
+services:
+  # --------------------------------------------------------------------------
+  # GOOGLE GENAI TOOLBOX SERVER
+  # --------------------------------------------------------------------------
+  # Tool-serving control plane for database operations.
+  # Agents/clients call Toolbox tools; Toolbox handles connection/auth/pooling.
+  # Ref: https://github.com/googleapis/genai-toolbox
+  # --------------------------------------------------------------------------
+  toolbox:
+    image: ghcr.io/googleapis/genai-toolbox:latest
+    container_name: ${COMPOSE_PROJECT_NAME:-ipai}_toolbox
+    command: ["--tools-file", "/app/tools.yaml"]
+    ports:
+      - "${TOOLBOX_PORT:-5000}:5000"
+    environment:
+      # Database Connections (env substitution in tools.yaml)
+      - WORKBENCH_PG_HOST=${POSTGRES_HOST:-postgres}
+      - WORKBENCH_PG_PORT=${POSTGRES_PORT:-5432}
+      - WORKBENCH_PG_USER=${POSTGRES_USER:-workbench}
+      - WORKBENCH_PG_PASSWORD=${POSTGRES_PASSWORD}
+      - WORKBENCH_PG_DB=${POSTGRES_DB:-workbench}
+
+      # OpenTelemetry (built-in support)
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      - OTEL_SERVICE_NAME=genai-toolbox
+      - OTEL_RESOURCE_ATTRIBUTES=service.namespace=insightpulseai,deployment.environment=${TOOLBOX_ENV:-development}
+    volumes:
+      - ../tools/toolbox/tools.yaml:/app/tools.yaml:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    labels:
+      - "com.insightpulseai.service=genai-toolbox"
+      - "com.insightpulseai.description=Google GenAI Toolbox for Database Operations"
+
+  # --------------------------------------------------------------------------
+  # TOOLBOX (Development Profile)
+  # --------------------------------------------------------------------------
+  # Development instance with verbose logging.
+  # Activated via: docker compose --profile dev up
+  # --------------------------------------------------------------------------
+  toolbox-dev:
+    image: ghcr.io/googleapis/genai-toolbox:latest
+    container_name: ${COMPOSE_PROJECT_NAME:-ipai}_toolbox_dev
+    command: ["--tools-file", "/app/tools.yaml", "--address", "0.0.0.0:5000"]
+    ports:
+      - "${TOOLBOX_DEV_PORT:-5010}:5000"
+    environment:
+      - WORKBENCH_PG_HOST=${POSTGRES_HOST:-postgres}
+      - WORKBENCH_PG_PORT=${POSTGRES_PORT:-5432}
+      - WORKBENCH_PG_USER=${POSTGRES_USER:-workbench}
+      - WORKBENCH_PG_PASSWORD=${POSTGRES_PASSWORD}
+      - WORKBENCH_PG_DB=${POSTGRES_DB:-workbench}
+    volumes:
+      - ../tools/toolbox/tools.yaml:/app/tools.yaml:ro
+    depends_on:
+      - postgres
+    networks:
+      - backend
+    profiles:
+      - dev
+    restart: unless-stopped
+
+  # --------------------------------------------------------------------------
+  # POSTGRES (if not using base compose)
+  # --------------------------------------------------------------------------
+  # Include if running toolbox standalone without base compose.
+  # Comment out if using: -f docker-compose.base.yml -f docker-compose.toolbox.yml
+  # --------------------------------------------------------------------------
+  postgres:
+    image: postgres:15-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-ipai}_toolbox_postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-workbench}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}
+      POSTGRES_DB: ${POSTGRES_DB:-workbench}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - toolbox-postgres-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-workbench} -d ${POSTGRES_DB:-workbench}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    profiles:
+      - standalone
+
+# ============================================================================
+# NETWORKS
+# ============================================================================
+networks:
+  backend:
+    driver: bridge
+    name: ${COMPOSE_PROJECT_NAME:-ipai}_toolbox_backend
+
+# ============================================================================
+# VOLUMES
+# ============================================================================
+volumes:
+  toolbox-postgres-data:
+    name: ${COMPOSE_PROJECT_NAME:-ipai}_toolbox_postgres_data

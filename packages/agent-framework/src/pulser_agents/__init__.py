@@ -34,6 +34,9 @@ from pulser_agents.core.exceptions import (
 from pulser_agents.core.message import Message, MessageRole
 from pulser_agents.core.response import AgentResponse, StreamingResponse
 
+# Toolbox integration (import separately to avoid requiring httpx)
+# from pulser_agents.toolbox import ToolboxClient, ToolboxClientConfig
+
 # Version
 __version__ = "0.1.0"
 
