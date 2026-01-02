@@ -11,6 +11,9 @@ Features:
 - Memory and context management
 - Middleware architecture for extensibility
 - Streaming and async-first design
+- Rules system (.cursor/rules pattern)
+- Codebase indexing with semantic search
+- @ symbol context injection
 
 Example:
     >>> from pulser_agents import Agent, OpenAIChatClient
@@ -34,8 +37,18 @@ from pulser_agents.core.exceptions import (
 from pulser_agents.core.message import Message, MessageRole
 from pulser_agents.core.response import AgentResponse, StreamingResponse
 
+# New P0 features
+from pulser_agents.rules import Rule, RulesEngine, RulesMiddleware, RuleType
+from pulser_agents.indexing import (
+    CodebaseIndexer,
+    CodeChunker,
+    SemanticSearch,
+    IndexConfig,
+)
+from pulser_agents.symbols import SymbolParser, SymbolResolver, SymbolsMiddleware
+
 # Version
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     # Core
@@ -47,6 +60,20 @@ __all__ = [
     "StreamingResponse",
     "AgentContext",
     "ConversationHistory",
+    # Rules System
+    "Rule",
+    "RulesEngine",
+    "RulesMiddleware",
+    "RuleType",
+    # Codebase Indexing
+    "CodebaseIndexer",
+    "CodeChunker",
+    "SemanticSearch",
+    "IndexConfig",
+    # @ Symbols
+    "SymbolParser",
+    "SymbolResolver",
+    "SymbolsMiddleware",
     # Exceptions
     "AgentError",
     "ProviderError",
